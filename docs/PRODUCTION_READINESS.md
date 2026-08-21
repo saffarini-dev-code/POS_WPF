@@ -32,8 +32,10 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] First-login mandatory password change
 - [x] Manager visibility restrictions
 - [x] Last Super Administrator protection
+- [x] Runtime permission service and service-boundary checks for core sales/purchasing/inventory/product operations
+- [x] Manager authorization service and prompt UI foundation
 - [ ] Permission enforcement across every protected command
-- [ ] Manager authorization workflow for every privileged POS action
+- [ ] Manager authorization integrated into every privileged POS action
 - [ ] Audit trail integrated with every sensitive mutation
 
 ## Operations
@@ -48,13 +50,11 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] Purchase return service
 - [x] Inventory adjustments
 - [x] Warehouse transfers
-- [x] Cash-register reconciliation service
+- [x] Cash-register reconciliation service and UI
 - [x] Sales/inventory report query services
-- [x] Customer/supplier account statement query services
+- [x] Customer/supplier account statement query services and UI
+- [x] Reports/export UI
 - [ ] Opening stock workflow UI
-- [ ] Customer credit/account statement UI
-- [ ] Supplier account statement UI
-- [ ] Reports/export UI
 - [ ] Full POS discounts/promotions/tax UI
 - [ ] Receipt reprint/void workflow UI
 
@@ -68,9 +68,9 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] Native Windows printing implementation
 - [x] Offline synchronization queue foundation
 - [x] Sync batch/conflict contracts and queue processor
+- [x] Configurable HTTP synchronization transport
 - [x] SQLite backup service
 - [x] Crash/error logging
-- [ ] Concrete remote sync transport configuration
 - [ ] Restore workflow UI and scheduled backup policy
 - [ ] Update/upgrade strategy
 - [ ] Hardware-specific smoke tests
@@ -78,6 +78,7 @@ This document is a release gate, not a feature wishlist. A release may only be d
 ## Verification
 
 - [x] Single-project deterministic business-rule verification harness
+- [x] EF Core SQLite model/persistence smoke verification harness
 - [x] GitHub Actions Release build workflow defined
 - [x] GitHub Actions verification command defined
 - [ ] GitHub Actions restore/build execution confirmed green
