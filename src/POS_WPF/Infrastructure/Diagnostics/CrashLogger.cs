@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace POS_WPF.Infrastructure.Diagnostics;
 
 public sealed class CrashLogger
