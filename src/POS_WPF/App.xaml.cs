@@ -5,9 +5,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using POS_WPF.Data;
 using POS_WPF.Domain.Inventory;
-using POS_WPF.Domain.Products;
-using POS_WPF.Infrastructure.Security;
 using POS_WPF.Domain.Pricing;
+using POS_WPF.Domain.Products;
+using POS_WPF.Infrastructure.Localization;
+using POS_WPF.Infrastructure.Security;
 
 namespace POS_WPF;
 
@@ -19,13 +20,20 @@ public partial class App : Application
     {
         base.OnStartup(e);
         _host = Host.CreateDefaultBuilder()
-            .ConfigureServices((_, services) =>
+            .ConfigureServices((context, services) =>
             {
-                services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite("Data Source=pos-local.db"));
+                var provider = context.Configuration["Database:Provider"] ?? "Sqlite";
+                var connectionString = context.Configuration["Database:ConnectionString"] ?? "Data Source=pos-local.db";
+                services.AddDbContextFactory<AppDbContext>(options =>
+                {
+                    if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase)) options.UseSqlServer(connectionString);
+                    else options.UseSqlite(connectionString);
+                });
                 services.AddSingleton<UnitConversionService>();
                 services.AddSingleton<InventoryService>();
                 services.AddSingleton<InventoryBalanceService>();
                 services.AddSingleton<PricingCalculator>();
+                services.AddSingleton<LocalizationService>();
                 services.AddSingleton<IPasswordHasher, PasswordHasher>();
                 services.AddSingleton<MainWindow>();
                 services.AddLogging(builder => builder.AddConsole());
