@@ -12,14 +12,17 @@ public sealed class Promotion : Entity
         Code = code.Trim(); Name = name.Trim(); Type = type; StartsAtUtc = startsAtUtc; EndsAtUtc = endsAtUtc;
         if (EndsAtUtc.HasValue && EndsAtUtc < StartsAtUtc) throw new ArgumentException("Promotion end must be after its start.");
     }
-    public string Code { get; private set; } = string.Empty;
-    public string Name { get; private set; } = string.Empty;
-    public PromotionType Type { get; private set; }
-    public decimal Value { get; private set; }
-    public decimal MinimumQuantity { get; private set; }
-    public decimal RewardQuantity { get; private set; }
-    public DateTime StartsAtUtc { get; private set; }
-    public DateTime? EndsAtUtc { get; private set; }
-    public bool IsActive { get; private set; } = true;
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public PromotionType Type { get; set; }
+    public Guid? ProductId { get; set; }
+    public Guid? UnitId { get; set; }
+    public decimal Value { get; set; }
+    public decimal MinimumQuantity { get; set; }
+    public decimal RewardQuantity { get; set; }
+    public decimal? MaxQuantity { get; set; }
+    public DateTime StartsAtUtc { get; set; }
+    public DateTime? EndsAtUtc { get; set; }
+    public bool IsActive { get; set; } = true;
     public bool IsCurrentlyActive(DateTime utcNow) => IsActive && utcNow >= StartsAtUtc && (!EndsAtUtc.HasValue || utcNow <= EndsAtUtc.Value);
 }
