@@ -20,3 +20,5 @@ jobs:
         run: dotnet restore POS_WPF.sln
       - name: Build
         run: dotnet build POS_WPF.sln --configuration Release --no-restore
+      - name: Business verification
+        run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
