@@ -10,6 +10,7 @@ public sealed class StoreSettings : Entity
     public void AssignBranch(Guid branchId) { BranchId = branchId; UpdatedAtUtc = DateTime.UtcNow; }
     public void ConfigureIdentity(string name, string currencyCode, string? arabicName) { if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(currencyCode)) throw new ArgumentException("Store name and currency are required."); StoreName = name.Trim(); CurrencyCode = currencyCode.Trim().ToUpperInvariant(); StoreNameArabic = arabicName?.Trim(); UpdatedAtUtc = DateTime.UtcNow; }
     public void ConfigureLogo(string? logoPath) { LogoPath = string.IsNullOrWhiteSpace(logoPath) ? null : logoPath.Trim(); UpdatedAtUtc = DateTime.UtcNow; }
+    public void ConfigureContact(string? address, string? country, string? city, string? phone, string? mobile, string? email, string? website) { Address = address?.Trim(); Country = country?.Trim() ?? string.Empty; City = city?.Trim() ?? string.Empty; Phone = phone?.Trim(); Mobile = mobile?.Trim(); Email = email?.Trim(); Website = website?.Trim(); UpdatedAtUtc = DateTime.UtcNow; }
 }
 
 public sealed class InvoiceSettings : Entity
