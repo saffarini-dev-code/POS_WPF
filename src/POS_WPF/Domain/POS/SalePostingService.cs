@@ -6,6 +6,7 @@ using POS_WPF.Domain.Finance;
 using POS_WPF.Domain.Inventory;
 using POS_WPF.Domain.Sales;
 using POS_WPF.Domain.Sync;
+using POS_WPF.Infrastructure.Security;
 
 namespace POS_WPF.Domain.POS;
 
@@ -14,10 +15,11 @@ public sealed record SalePaymentRequest(string Method, decimal Amount);
 public sealed record SalePostingRequest(Guid BranchId, Guid WarehouseId, Guid TerminalId, Guid RegisterId, Guid CashierId, string Number, Guid? CustomerId, IReadOnlyList<SaleLineRequest> Lines, IReadOnlyList<SalePaymentRequest> Payments);
 public sealed record SalePostingResult(Guid SaleId, decimal Total, decimal Change);
 
-public sealed class SalePostingService(IDbContextFactory<AppDbContext> dbFactory)
+public sealed class SalePostingService(IDbContextFactory<AppDbContext> dbFactory, PermissionService permissions)
 {
     public async Task<SalePostingResult> PostAsync(SalePostingRequest request, CancellationToken cancellationToken = default)
     {
+        await permissions.DemandAsync("Sales.Create", cancellationToken);
         if (request.Lines.Count == 0) throw new InvalidOperationException("The sale must contain at least one line.");
         if (request.Payments.Count == 0) throw new InvalidOperationException("The sale must contain a payment.");
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken); await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -41,13 +43,9 @@ public sealed class SalePostingService(IDbContextFactory<AppDbContext> dbFactory
                 var customer = await db.Customers.SingleAsync(x => x.Id == request.CustomerId.Value && x.IsActive, cancellationToken); customer.ApplyBalance(creditAmount);
                 db.AccountTransactions.Add(new AccountTransaction(AccountPartyType.Customer, customer.Id, AccountTransactionType.Invoice, creditAmount, 0m, request.Number));
             }
-            db.Sales.Add(sale);
-            db.CashMovements.AddRange(request.Payments.Where(x => string.Equals(x.Method, "Cash", StringComparison.OrdinalIgnoreCase)).Select(x => new CashMovement(request.RegisterId, CashMovementType.Sale, x.Amount, request.Number, request.CashierId)));
-            db.AuditEntries.Add(new AuditEntry(request.CashierId, "Sale.Completed", nameof(Sale), sale.Id, null, $"Total={sale.Total};Credit={creditAmount}", null, request.TerminalId, request.Number));
-            db.SyncQueueEntries.Add(new SyncQueueEntry(nameof(Sale), sale.Id, "Create", request.Number));
-            await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
-            var paid = request.Payments.Where(x => !string.Equals(x.Method, "Credit", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
-            return new SalePostingResult(sale.Id, sale.Total, Math.Max(0m, paid - (sale.Total - creditAmount)));
+            db.Sales.Add(sale); db.CashMovements.AddRange(request.Payments.Where(x => string.Equals(x.Method, "Cash", StringComparison.OrdinalIgnoreCase)).Select(x => new CashMovement(request.RegisterId, CashMovementType.Sale, x.Amount, request.Number, request.CashierId)));
+            db.AuditEntries.Add(new AuditEntry(request.CashierId, "Sale.Completed", nameof(Sale), sale.Id, null, $"Total={sale.Total};Credit={creditAmount}", null, request.TerminalId, request.Number)); db.SyncQueueEntries.Add(new SyncQueueEntry(nameof(Sale), sale.Id, "Create", request.Number));
+            await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken); var paid = request.Payments.Where(x => !string.Equals(x.Method, "Credit", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount); return new SalePostingResult(sale.Id, sale.Total, Math.Max(0m, paid - (sale.Total - creditAmount)));
         }
         catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
