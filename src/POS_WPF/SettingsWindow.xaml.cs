@@ -20,8 +20,9 @@ public partial class SettingsWindow : Window
     {
         await using var db = await _dbFactory.CreateDbContextAsync(); var branch = await db.Branches.OrderBy(x => x.Code).FirstAsync(); var settings = await db.StoreSettings.SingleOrDefaultAsync(x => x.BranchId == branch.Id); var tax = await db.TaxSettings.FirstOrDefaultAsync();
         StoreNameBox.Text = settings?.StoreName ?? "Retail POS"; ArabicNameBox.Text = settings?.StoreNameArabic ?? string.Empty; CurrencyBox.SelectedValue = settings?.CurrencyCode ?? "JOD"; TaxRateBox.Text = (tax?.Rate ?? 0m).ToString(CultureInfo.InvariantCulture); LanguageBox.SelectedIndex = _localization.CurrentLanguage == AppLanguage.Arabic ? 1 : 0;
-        _selectedLogoPath = settings?.LogoPath; LogoPathText.Text = _selectedLogoPath ?? "No logo selected"; LoadLogoPreview(_selectedLogoPath);
+        _selectedLogoPath = settings?.LogoPath; var logoFullPath = ResolveLogoPath(_selectedLogoPath); LogoPathText.Text = _selectedLogoPath ?? "No logo selected"; LoadLogoPreview(logoFullPath);
     }
+    private static string? ResolveLogoPath(string? path) => string.IsNullOrWhiteSpace(path) ? null : Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
     private void ChooseLogo_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Title = "Choose Store Logo", Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp|All Files|*.*", CheckFileExists = true };
