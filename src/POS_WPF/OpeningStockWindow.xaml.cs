@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Data;
+using POS_WPF.Domain.Inventory;
 using POS_WPF.Infrastructure.Security;
 
 namespace POS_WPF;
