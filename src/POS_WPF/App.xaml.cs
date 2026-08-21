@@ -30,10 +30,9 @@ public partial class App : Application
         base.OnStartup(e);
         _host = Host.CreateDefaultBuilder().ConfigureServices((context, services) =>
         {
-            var provider = context.Configuration["Database:Provider"] ?? "Sqlite";
-            var connectionString = context.Configuration["Database:ConnectionString"] ?? "Data Source=pos-local.db";
+            var provider = context.Configuration["Database:Provider"] ?? "Sqlite"; var connectionString = context.Configuration["Database:ConnectionString"] ?? "Data Source=pos-local.db";
             services.AddDbContextFactory<AppDbContext>(options => { if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase)) options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()); else options.UseSqlite(connectionString); });
-            services.AddSingleton<UnitConversionService>(); services.AddSingleton<UnitConversionGraph>(); services.AddSingleton<InventoryService>(); services.AddSingleton<InventoryBalanceService>(); services.AddSingleton<PricingCalculator>(); services.AddSingleton<LocalizationService>();
+            services.AddSingleton<UnitConversionService>(); services.AddSingleton<UnitConversionGraph>(); services.AddSingleton<InventoryService>(); services.AddSingleton<InventoryBalanceService>(); services.AddSingleton<InventoryOperationsService>(); services.AddSingleton<PricingCalculator>(); services.AddSingleton<LocalizationService>();
             services.AddSingleton<IPasswordHasher, PasswordHasher>(); services.AddSingleton<DatabaseAuthenticationService>(); services.AddSingleton<ApplicationSeeder>(); services.AddSingleton<UserAdministrationService>(); services.AddSingleton<SessionContext>();
             services.AddSingleton<BarcodeLookupService>(); services.AddSingleton<SalePostingService>(); services.AddSingleton<PurchasePostingService>(); services.AddSingleton<SalesReturnPostingService>(); services.AddSingleton<CashRegisterService>(); services.AddSingleton<ReportQueryService>(); services.AddSingleton<DatabaseBackupService>(); services.AddSingleton<VerificationRunner>();
             services.AddSingleton<IReceiptPrinter, WindowsPrintService>(); services.AddSingleton<IDocumentPrinter, WindowsPrintService>(); services.AddSingleton<ILabelPrinter, WindowsPrintService>(); services.AddSingleton<ISyncConflictResolver, DefaultSyncConflictResolver>(); services.AddLogging(builder => builder.AddConsole());
