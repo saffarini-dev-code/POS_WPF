@@ -1,11 +1,15 @@
 namespace POS_WPF.Domain.Reports;
 
-public sealed record ReportDateRange(DateTime FromUtc, DateTime ToUtc)
+public sealed record ReportDateRange
 {
-    public ReportDateRange(DateTime fromUtc, DateTime toUtc) : this()
+    public ReportDateRange(DateTime fromUtc, DateTime toUtc)
     {
         if (toUtc < fromUtc) throw new ArgumentException("Report end must be after report start.");
+        FromUtc = fromUtc;
+        ToUtc = toUtc;
     }
+    public DateTime FromUtc { get; }
+    public DateTime ToUtc { get; }
 }
 
 public sealed record SalesReportRow(DateTime Date, string DocumentNumber, string Product, string Unit, decimal Quantity, decimal NetSales, decimal Tax, decimal Total);
