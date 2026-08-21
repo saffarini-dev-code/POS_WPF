@@ -21,8 +21,9 @@ public sealed class Promotion : Entity
     public decimal MinimumQuantity { get; set; }
     public decimal RewardQuantity { get; set; }
     public decimal? MaxQuantity { get; set; }
+    public decimal ConsumedQuantity { get; set; }
     public DateTime StartsAtUtc { get; set; }
     public DateTime? EndsAtUtc { get; set; }
     public bool IsActive { get; set; } = true;
-    public bool IsCurrentlyActive(DateTime utcNow) => IsActive && utcNow >= StartsAtUtc && (!EndsAtUtc.HasValue || utcNow <= EndsAtUtc.Value);
+    public bool IsCurrentlyActive(DateTime utcNow) => IsActive && utcNow >= StartsAtUtc && (!EndsAtUtc.HasValue || utcNow <= EndsAtUtc.Value) && (!MaxQuantity.HasValue || ConsumedQuantity < MaxQuantity.Value);
 }
