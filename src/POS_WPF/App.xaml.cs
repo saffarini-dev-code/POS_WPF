@@ -37,15 +37,10 @@ public partial class App : Application
             services.AddSingleton<IPasswordHasher, PasswordHasher>(); services.AddSingleton<DatabaseAuthenticationService>(); services.AddSingleton<ApplicationSeeder>(); services.AddSingleton<UserAdministrationService>(); services.AddSingleton<SessionContext>();
             services.AddSingleton<BarcodeLookupService>(); services.AddSingleton<SalePostingService>(); services.AddSingleton<PurchasePostingService>(); services.AddSingleton<SalesReturnPostingService>(); services.AddSingleton<CashRegisterService>(); services.AddSingleton<ReportQueryService>(); services.AddSingleton<DatabaseBackupService>(); services.AddSingleton<VerificationRunner>();
             services.AddSingleton<IReceiptPrinter, WindowsPrintService>(); services.AddSingleton<IDocumentPrinter, WindowsPrintService>(); services.AddSingleton<ILabelPrinter, WindowsPrintService>(); services.AddSingleton<ISyncConflictResolver, DefaultSyncConflictResolver>(); services.AddLogging(builder => builder.AddConsole());
-            services.AddTransient<LoginWindow>(); services.AddTransient<PosWindow>(); services.AddSingleton<MainWindow>();
+            services.AddTransient<LoginWindow>(); services.AddTransient<PosWindow>(); services.AddTransient<ProductManagementWindow>(); services.AddSingleton<MainWindow>();
         }).Build();
         await _host.StartAsync();
-        if (e.Args.Any(x => string.Equals(x, "--verify", StringComparison.OrdinalIgnoreCase)))
-        {
-            var results = _host.Services.GetRequiredService<VerificationRunner>().RunAll();
-            foreach (var result in results) Console.WriteLine($"[{(result.Passed ? "PASS" : "FAIL")}] {result.Name}{(result.Error is null ? string.Empty : $": {result.Error}")}");
-            Shutdown(results.All(x => x.Passed) ? 0 : 1); return;
-        }
+        if (e.Args.Any(x => string.Equals(x, "--verify", StringComparison.OrdinalIgnoreCase))) { var results = _host.Services.GetRequiredService<VerificationRunner>().RunAll(); foreach (var result in results) Console.WriteLine($"[{(result.Passed ? "PASS" : "FAIL")}] {result.Name}{(result.Error is null ? string.Empty : $": {result.Error}")}"); Shutdown(results.All(x => x.Passed) ? 0 : 1); return; }
         await using (var scope = _host.Services.CreateAsyncScope()) { var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>(); await using var db = await factory.CreateDbContextAsync(); await db.Database.EnsureCreatedAsync(); await scope.ServiceProvider.GetRequiredService<ApplicationSeeder>().SeedAsync(); }
         _host.Services.GetRequiredService<LoginWindow>().Show();
     }
