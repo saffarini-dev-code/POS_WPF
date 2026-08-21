@@ -1,24 +1,28 @@
 # Production Candidate Gate
 
-Current candidate branch: `feature/pos-foundation`
+Current candidate branch: `ci-production`.
 
-A frozen `production-candidate` branch was created from the candidate head for inspection.
+## Verified
 
-## Verified from repository state
-
-- Single WPF project architecture is present under `src/POS_WPF`.
+- Single WPF project architecture under `src/POS_WPF` and one project in `POS_WPF.sln`.
 - Unit conversion, inventory ledger, purchasing, sales, returns, payments, accounts, cash register, reporting, printing, backup, synchronization, security and localization foundations are present.
 - GitHub Actions build and production publish workflows are present.
-- A deterministic `--verify` harness includes business-rule checks and an EF Core SQLite persistence smoke test.
+- Windows/.NET 10 CI Run #189 completed successfully.
+- Deterministic business verification and EF Core SQLite persistence smoke test completed successfully in Run #189.
+- Production publish workflow now validates the exact source ref, runs verification before publishing, checks the executable, generates SHA-256 and build metadata, and uploads a ZIP artifact.
+- Production qualification workflow performs Release build, business verification, self-contained win-x64 publish and package-integrity smoke checks.
 
-## External verification still required
+## Remaining release gates
 
-The GitHub connector reports PR #1 as `mergeable=false` and the feature branch is divergent from `main`. GitHub Actions execution could not be observed through the available repository connector in this session. Therefore this candidate must not be labeled Production Ready until:
+The repository must not be labeled Production Ready until the following environment-dependent gates are actually executed and signed off:
 
-1. The branch divergence/conflicts are reconciled on GitHub.
-2. GitHub Actions Release build completes successfully.
-3. The `--verify` harness completes successfully in Windows CI.
-4. Real database integration, migration/upgrade, printing, hardware, offline/online synchronization and performance tests are executed.
-5. The remaining unchecked gates in `docs/PRODUCTION_READINESS.md` are closed.
+1. Real database integration tests for inventory, sales/payments, returns and permissions.
+2. EF migration/upgrade test against the supported production database path.
+3. Fresh-install and upgrade-from-previous-version smoke tests.
+4. Physical receipt/label printer tests on target Windows hardware.
+5. Offline/online synchronization test against the actual synchronization endpoint.
+6. Performance/load smoke test using representative retail data.
+7. Backup restore drill and scheduled backup policy validation.
+8. Full privileged-command permission/audit review.
 
-This file intentionally prevents an unsupported Production Ready claim.
+These are deliberately retained as release gates because they cannot be truthfully marked complete from static repository inspection alone.
