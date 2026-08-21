@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using POS_WPF.Data;
+using POS_WPF.Infrastructure.Security;
 using POS_WPF.Domain.Inventory;
-using POS_WPF.Domain.Products;
 
 namespace POS_WPF;
 
@@ -20,13 +20,10 @@ public partial class App : Application
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((_, services) =>
             {
-                services.AddDbContextFactory<AppDbContext>(options =>
-                {
-                    options.UseSqlite("Data Source=pos-local.db");
-                });
-
+                services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite("Data Source=pos-local.db"));
                 services.AddSingleton<UnitConversionService>();
                 services.AddSingleton<InventoryService>();
+                services.AddSingleton<IPasswordHasher, PasswordHasher>();
                 services.AddSingleton<MainWindow>();
                 services.AddLogging(builder => builder.AddConsole());
             })
@@ -52,7 +49,6 @@ public partial class App : Application
             await _host.StopAsync();
             _host.Dispose();
         }
-
         base.OnExit(e);
     }
 }
