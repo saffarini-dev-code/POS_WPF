@@ -3,19 +3,21 @@ using POS_WPF.Data;
 
 namespace POS_WPF.Infrastructure.Security;
 
+public sealed record VisibleUser(Guid Id, string Username, string DisplayName, string Role);
+
 public sealed class UserAdministrationService(IDbContextFactory<AppDbContext> dbFactory)
 {
-    public async Task<IReadOnlyList<(Guid Id, string Username, string DisplayName)>> GetVisibleUsersAsync(string currentRole, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<VisibleUser>> GetVisibleUsersAsync(string currentRole, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var query = from user in db.Users
                     join userRole in db.UserRoles on user.Id equals userRole.UserId
                     join role in db.Roles on userRole.RoleId equals role.Id
                     where user.IsActive
-                    select new { user.Id, user.Username, user.DisplayName, Role = role.Name };
+                    select new VisibleUser(user.Id, user.Username, user.DisplayName, role.Name);
         if (string.Equals(currentRole, PermissionCatalog.Manager, StringComparison.OrdinalIgnoreCase))
             query = query.Where(x => x.Role != PermissionCatalog.SuperAdministrator);
-        return await query.AsNoTracking().Select(x => ValueTuple.Create(x.Id, x.Username, x.DisplayName)).ToListAsync(cancellationToken);
+        return await query.AsNoTracking().ToListAsync(cancellationToken);
     }
 
     public async Task<bool> CanDisableAsync(Guid targetUserId, CancellationToken cancellationToken = default)
