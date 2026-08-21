@@ -110,6 +110,7 @@ public partial class PosWindow
 
     private void UpdateTouchChange()
     {
+        if (PaymentBox is null || TotalText is null || ChangeText is null) return;
         if (!decimal.TryParse(PaymentBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var received)) received = 0;
         if (!decimal.TryParse(TotalText.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var total)) total = 0;
         ChangeText.Text = Math.Max(0, received - total).ToString("N2", CultureInfo.CurrentCulture);
@@ -156,7 +157,6 @@ public partial class PosWindow
             Grid.SetRow(title, 0); root.Children.Add(title);
             var summary = new TextBlock { Margin = new Thickness(0, 6, 0, 18), Text = $"SKU: {product.Sku}\nCategory: {categoryName ?? "Uncategorized"}", FontSize = 13, Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)) };
             Grid.SetRow(summary, 1); root.Children.Add(summary);
-
             var details = new StackPanel();
             foreach (var unit in product.Units.Where(x => x.IsActive).OrderByDescending(x => x.IsBaseUnit))
             {
