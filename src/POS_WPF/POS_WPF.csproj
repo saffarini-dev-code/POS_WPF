@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>AnyCPU</Platforms>
     <LangVersion>latest</LangVersion>
+    <RootNamespace>POS_WPF</RootNamespace>
+    <AssemblyName>POS_WPF</AssemblyName>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
