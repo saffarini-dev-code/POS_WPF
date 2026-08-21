@@ -15,7 +15,9 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] Sales aggregate and atomic posting workflow
 - [x] Purchase aggregate and atomic receiving workflow
 - [x] Sales return aggregate and atomic inventory restoration workflow
-- [x] Customer and supplier account foundation
+- [x] Purchase return inventory/supplier account posting service
+- [x] Customer and supplier account foundation and ledger
+- [x] Customer and supplier payment services
 - [x] Branch, warehouse and terminal foundation
 - [x] Cash-register open/close and reconciliation rules
 - [x] Pricing, discount and tax calculation foundation
@@ -43,12 +45,13 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] Payment tender and change calculation
 - [x] Purchasing/receiving service with inventory posting
 - [x] Sales return service with historical unit conversion
+- [x] Purchase return service
 - [x] Inventory adjustments
 - [x] Warehouse transfers
 - [x] Cash-register reconciliation service
 - [x] Sales/inventory report query services
+- [x] Customer/supplier account statement query services
 - [ ] Opening stock workflow UI
-- [ ] Purchase return workflow UI/service
 - [ ] Customer credit/account statement UI
 - [ ] Supplier account statement UI
 - [ ] Reports/export UI
