@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Markup;
 using POS_WPF.Infrastructure.Security;
@@ -54,11 +53,8 @@ public partial class PosWindow
     {
         foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
         {
-            if (child is Button button && button.Template is null)
+            if (child is Button button)
                 button.Template = CreateRoundedButtonTemplate();
-            else if (child is Button button2 && button2.Template is not null)
-                button2.Template = CreateRoundedButtonTemplate();
-
             ApplyRoundedButtons(child);
         }
     }
@@ -66,9 +62,18 @@ public partial class PosWindow
     private static ControlTemplate CreateRoundedButtonTemplate()
     {
         const string template = @"
-<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='{x:Type Button}'>
-  <Border Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='5' Padding='{TemplateBinding Padding}'>
-    <ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}' Content='{TemplateBinding Content}' ContentTemplate='{TemplateBinding ContentTemplate}' />
+<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                 xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+                 TargetType='{x:Type Button}'>
+  <Border Background='{TemplateBinding Background}'
+          BorderBrush='{TemplateBinding BorderBrush}'
+          BorderThickness='{TemplateBinding BorderThickness}'
+          CornerRadius='5'
+          Padding='{TemplateBinding Padding}'>
+    <ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}'
+                      VerticalAlignment='{TemplateBinding VerticalContentAlignment}'
+                      Content='{TemplateBinding Content}'
+                      ContentTemplate='{TemplateBinding ContentTemplate}' />
   </Border>
 </ControlTemplate>";
         return (ControlTemplate)XamlReader.Parse(template);
