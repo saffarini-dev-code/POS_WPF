@@ -81,7 +81,7 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] EF Core SQLite model/persistence smoke verification harness
 - [x] GitHub Actions Release build workflow defined
 - [x] GitHub Actions verification command defined
-- [ ] GitHub Actions restore/build execution confirmed green
+- [x] GitHub Actions restore/build execution confirmed green — Run #189, commit `5de482c9`
 - [ ] Inventory posting integration tests pass against a real database
 - [ ] Sales/payment integration tests pass against a real database
 - [ ] Returns integration tests pass against a real database
@@ -92,6 +92,17 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [ ] Print workflow smoke tests pass on target hardware
 - [ ] Offline/online synchronization tests pass against a real endpoint
 - [ ] Performance smoke test passes
+
+## Release automation
+
+- [x] Windows x64 self-contained publish workflow
+- [x] Exact-source checkout for release
+- [x] Production verification before publish
+- [x] Executable existence check
+- [x] SHA-256 checksum generation
+- [x] Build metadata generation
+- [x] ZIP artifact generation and upload
+- [x] Production qualification workflow
 
 ## Release rule
 
