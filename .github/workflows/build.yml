@@ -2,9 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [ main, feature/** ]
+    branches: [ main, feature/**, ci-production ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
