@@ -192,7 +192,7 @@ public partial class PosWindow
     {
         var template = new DataTemplate();
         var panel = new FrameworkElementFactory(typeof(Grid));
-        panel.SetValue(Grid.MarginProperty, new Thickness(10, 6));
+        panel.SetValue(Grid.MarginProperty, new Thickness(10, 6, 10, 6));
         panel.AppendChild(BoundText(nameof(ProductStockRow.Warehouse), 0, false));
         panel.AppendChild(BoundText(nameof(ProductStockRow.Quantity), 1, true, "N3"));
         template.VisualTree = panel;
