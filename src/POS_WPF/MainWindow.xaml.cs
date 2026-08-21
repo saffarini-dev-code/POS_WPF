@@ -11,4 +11,5 @@ public partial class MainWindow : Window
     private void OpenProducts_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<ProductManagementWindow>().Show();
     private void OpenCashRegister_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<CashRegisterWindow>().Show();
     private void OpenReports_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<ReportsWindow>().Show();
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<SettingsWindow>().Show();
 }
