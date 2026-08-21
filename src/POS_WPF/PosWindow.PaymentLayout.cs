@@ -34,6 +34,11 @@ public partial class PosWindow
         if (paymentGrid is null) return;
 
         _paymentLayoutApplied = true;
+
+        // Detach the controls we keep before removing their old StackPanel parent.
+        if (CardButton.Parent is Panel oldPanel)
+            oldPanel.Children.Clear();
+
         paymentGrid.Children.Clear();
         paymentGrid.RowDefinitions.Clear();
         paymentGrid.ColumnDefinitions.Clear();
