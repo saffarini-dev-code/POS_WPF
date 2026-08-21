@@ -11,6 +11,8 @@ public sealed class ProductUnit
     public decimal ConversionFactorToBase { get; set; } = 1m;
     public decimal SellingPrice { get; set; }
     public decimal PurchasePrice { get; set; }
+    public decimal WholesalePrice { get; set; }
+    public decimal WholesaleWholesalePrice { get; set; }
     public bool IsBaseUnit { get; set; }
     public bool CanSell { get; set; } = true;
     public bool CanPurchase { get; set; } = true;
