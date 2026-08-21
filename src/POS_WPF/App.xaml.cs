@@ -1,3 +1,4 @@
+using System.Data;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
@@ -43,9 +44,47 @@ public partial class App : Application
         }).Build();
         _crashLogger = _host.Services.GetRequiredService<CrashLogger>(); await _host.StartAsync();
         if (e.Args.Any(x => string.Equals(x, "--verify", StringComparison.OrdinalIgnoreCase))) { var results = await _host.Services.GetRequiredService<VerificationRunner>().RunAllAsync(); foreach (var result in results) Console.WriteLine($"[{(result.Passed ? "PASS" : "FAIL")}] {result.Name}{(result.Error is null ? string.Empty : $": {result.Error}")}"); Shutdown(results.All(x => x.Passed) ? 0 : 1); return; }
-        await using (var scope = _host.Services.CreateAsyncScope()) { var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>(); await using var db = await factory.CreateDbContextAsync(); await db.Database.EnsureCreatedAsync(); await scope.ServiceProvider.GetRequiredService<ApplicationSeeder>().SeedAsync(); }
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+            await using var db = await factory.CreateDbContextAsync();
+            await db.Database.EnsureCreatedAsync();
+            await EnsureProductPricingColumnsAsync(db);
+            await scope.ServiceProvider.GetRequiredService<ApplicationSeeder>().SeedAsync();
+        }
         _host.Services.GetRequiredService<LoginWindow>().Show();
     }
+
+    private static async Task EnsureProductPricingColumnsAsync(AppDbContext db)
+    {
+        var isSqlServer = string.Equals(db.Database.ProviderName, "Microsoft.EntityFrameworkCore.SqlServer", StringComparison.OrdinalIgnoreCase);
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = isSqlServer
+            ? "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ProductUnits' AND COLUMN_NAME='WholesalePrice'"
+            : "SELECT COUNT(*) FROM pragma_table_info('ProductUnits') WHERE name='WholesalePrice'";
+        var exists = Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        if (!exists)
+        {
+            command.CommandText = isSqlServer
+                ? "ALTER TABLE [ProductUnits] ADD [WholesalePrice] decimal(18,2) NOT NULL CONSTRAINT [DF_ProductUnits_WholesalePrice] DEFAULT 0"
+                : "ALTER TABLE ProductUnits ADD COLUMN WholesalePrice decimal(18,2) NOT NULL DEFAULT 0";
+            await command.ExecuteNonQueryAsync();
+        }
+        command.CommandText = isSqlServer
+            ? "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ProductUnits' AND COLUMN_NAME='WholesaleWholesalePrice'"
+            : "SELECT COUNT(*) FROM pragma_table_info('ProductUnits') WHERE name='WholesaleWholesalePrice'";
+        exists = Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+        if (!exists)
+        {
+            command.CommandText = isSqlServer
+                ? "ALTER TABLE [ProductUnits] ADD [WholesaleWholesalePrice] decimal(18,2) NOT NULL CONSTRAINT [DF_ProductUnits_WholesaleWholesalePrice] DEFAULT 0"
+                : "ALTER TABLE ProductUnits ADD COLUMN WholesaleWholesalePrice decimal(18,2) NOT NULL DEFAULT 0";
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e) { _crashLogger?.Log(e.Exception, "DispatcherUnhandledException"); e.Handled = true; MessageBox.Show("An unexpected error occurred. The error has been logged.", "Retail POS", MessageBoxButton.OK, MessageBoxImage.Error); }
     protected override async void OnExit(ExitEventArgs e) { if (_host is not null) { await _host.StopAsync(); _host.Dispose(); } base.OnExit(e); }
 }
