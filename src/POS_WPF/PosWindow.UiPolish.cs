@@ -36,6 +36,7 @@ public partial class PosWindow
 
         ApplyRoundedBorders(root);
         ApplyRoundedButtons(root);
+        ApplyRoundedInputs(root);
         AddProtectedCloseButton(root);
     }
 
@@ -59,6 +60,18 @@ public partial class PosWindow
         }
     }
 
+    private static void ApplyRoundedInputs(DependencyObject parent)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            if (child is TextBox textBox)
+                textBox.Template = CreateRoundedInputTemplate(typeof(TextBox));
+            else if (child is PasswordBox passwordBox)
+                passwordBox.Template = CreateRoundedInputTemplate(typeof(PasswordBox));
+            ApplyRoundedInputs(child);
+        }
+    }
+
     private static ControlTemplate CreateRoundedButtonTemplate()
     {
         const string template = @"
@@ -74,6 +87,27 @@ public partial class PosWindow
                       VerticalAlignment='{TemplateBinding VerticalContentAlignment}'
                       Content='{TemplateBinding Content}'
                       ContentTemplate='{TemplateBinding ContentTemplate}' />
+  </Border>
+</ControlTemplate>";
+        return (ControlTemplate)XamlReader.Parse(template);
+    }
+
+    private static ControlTemplate CreateRoundedInputTemplate(Type targetType)
+    {
+        var target = targetType == typeof(PasswordBox) ? "PasswordBox" : "TextBox";
+        var content = target == "PasswordBox"
+            ? "<ScrollViewer x:Name='PART_ContentHost' VerticalAlignment='{TemplateBinding VerticalContentAlignment}' HorizontalScrollBarVisibility='Hidden' VerticalScrollBarVisibility='Hidden' />"
+            : "<ScrollViewer x:Name='PART_ContentHost' />";
+        var template = $@"
+<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                 xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+                 TargetType='{{x:Type {target}}}'>
+  <Border Background='{{TemplateBinding Background}}'
+          BorderBrush='{{TemplateBinding BorderBrush}}'
+          BorderThickness='{{TemplateBinding BorderThickness}}'
+          CornerRadius='5'
+          Padding='{{TemplateBinding Padding}}'>
+    {content}
   </Border>
 </ControlTemplate>";
         return (ControlTemplate)XamlReader.Parse(template);
