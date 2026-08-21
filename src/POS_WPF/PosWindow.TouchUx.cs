@@ -117,12 +117,7 @@ public partial class PosWindow
 
     private async void CartDiscount_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: object data } && data.GetType().Name == "CartItem")
-        {
-            var item = data;
-            var method = typeof(PosWindow).GetMethod("RecalculateLineAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            if (method?.Invoke(this, [item]) is Task task) await task;
-        }
+        if (sender is FrameworkElement { DataContext: CartItem item }) await RecalculateLineAsync(item);
     }
 
     private void PosWindow_PreviewKeyDown(object sender, KeyEventArgs e)
