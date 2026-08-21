@@ -12,5 +12,6 @@ public partial class MainWindow : Window
     private void OpenCashRegister_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<CashRegisterWindow>().Show();
     private void OpenReports_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<ReportsWindow>().Show();
     private void OpenSettings_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<SettingsWindow>().Show();
-    private void OpenAccounts_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<AccountsWindow>().Show();
+    private void OpenCustomers_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<AccountsWindow>().Show();
+    private void OpenSuppliers_Click(object sender, RoutedEventArgs e) => _services.GetRequiredService<AccountsWindow>().Show();
 }
