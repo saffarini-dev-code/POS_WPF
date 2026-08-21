@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.EntityFrameworkCore;
-using POS_WPF.Domain.Inventory;
 using POS_WPF.Domain.Products;
 using POS_WPF.Infrastructure.Security;
 
@@ -37,13 +36,8 @@ public partial class PosWindow
         CategoryTabsPanel.Children.Clear();
         AddCategoryTab("All", null, true);
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var categories = await db.Categories.AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Name)
-            .Select(x => new { x.Id, x.Name })
-            .ToListAsync();
-        foreach (var category in categories)
-            AddCategoryTab(category.Name, category.Id, false);
+        var categories = await db.Categories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new { x.Id, x.Name }).ToListAsync();
+        foreach (var category in categories) AddCategoryTab(category.Name, category.Id, false);
     }
 
     private void AddCategoryTab(string caption, Guid? categoryId, bool selected)
@@ -63,7 +57,7 @@ public partial class PosWindow
     private async void CategoryTab_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
-        var categoryId = button.Tag as Guid?;
+        var categoryId = button.Tag is Guid id ? id : (Guid?)null;
         foreach (var child in CategoryTabsPanel.Children.OfType<Button>())
         {
             var active = ReferenceEquals(child, button);
@@ -82,10 +76,7 @@ public partial class PosWindow
                 return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Name ?? "PCS");
             }).ToList();
         }
-        catch (Exception ex)
-        {
-            Status(ex.InnerException?.Message ?? ex.Message, false);
-        }
+        catch (Exception ex) { Status(ex.InnerException?.Message ?? ex.Message, false); }
     }
 
     private void KeypadTarget_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -121,17 +112,12 @@ public partial class PosWindow
 
     private void PosWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F1)
-        {
-            e.Handled = true;
-            MessageBox.Show(this, "F2 Hold\nF4 Invoice Discount\nF8 Void / Clear Cart\nF10 Charge\nCtrl+L Product Search", "POS Keyboard Shortcuts", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        if (e.Key == Key.F1) { e.Handled = true; MessageBox.Show(this, "F2 Hold\nF4 Invoice Discount\nF8 Void / Clear Cart\nF10 Charge\nCtrl+L Product Search", "POS Keyboard Shortcuts", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (e.Key == Key.F2) { e.Handled = true; Hold_Click(this, new RoutedEventArgs()); return; }
         if (e.Key == Key.F4) { e.Handled = true; InvoiceDiscountBox.Focus(); InvoiceDiscountBox.SelectAll(); return; }
         if (e.Key == Key.F8) { e.Handled = true; ClearCart_Click(this, new RoutedEventArgs()); return; }
         if (e.Key == Key.F10) { e.Handled = true; Complete_Click(this, new RoutedEventArgs()); return; }
-        if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; BarcodeBox.Focus(); BarcodeBox.SelectAll(); return; }
+        if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; BarcodeBox.Focus(); BarcodeBox.SelectAll(); }
     }
 
     private async void CheckProduct_Click(object sender, RoutedEventArgs e)
@@ -140,61 +126,30 @@ public partial class PosWindow
         try
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
-            var product = await db.Products.AsNoTracking().Include(x => x.Units).Include(x => x.Category)
-                .SingleOrDefaultAsync(x => x.Id == item.ProductId);
+            var product = await db.Products.AsNoTracking().Include(x => x.Units).SingleOrDefaultAsync(x => x.Id == item.ProductId);
             if (product is null) { Status("Product not found.", false); return; }
-
-            var stocks = await db.Warehouses.AsNoTracking().Where(w => w.IsActive)
-                .Select(w => new ProductStockRow
-                {
-                    Warehouse = $"{w.Code} — {w.Name}",
-                    Quantity = db.InventoryTransactions.Where(t => t.ProductId == product.Id && t.WarehouseId == w.Id).Sum(t => (decimal?)t.BaseQuantity) ?? 0m
-                }).OrderBy(x => x.Warehouse).ToListAsync();
-
-            var dialog = new Window
+            var categoryName = product.CategoryId.HasValue ? await db.Categories.AsNoTracking().Where(x => x.Id == product.CategoryId.Value).Select(x => x.Name).SingleOrDefaultAsync() : null;
+            var stocks = await db.Warehouses.AsNoTracking().Where(w => w.IsActive).Select(w => new ProductStockRow
             {
-                Owner = this,
-                Title = $"Check Product — {product.Name}",
-                Width = 720,
-                Height = 560,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                ResizeMode = ResizeMode.NoResize,
-                Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)),
-                WindowStyle = WindowStyle.SingleBorderWindow
-            };
+                Warehouse = $"{w.Code} — {w.Name}",
+                Quantity = db.InventoryTransactions.Where(t => t.ProductId == product.Id && t.WarehouseId == w.Id).Sum(t => (decimal?)t.BaseQuantity) ?? 0m
+            }).OrderBy(x => x.Warehouse).ToListAsync();
 
+            var dialog = new Window { Owner = this, Title = $"Check Product — {product.Name}", Width = 720, Height = 560, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)) };
             var root = new Grid { Margin = new Thickness(24) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
             var title = new TextBlock { Text = product.Name, FontSize = 24, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)) };
-            Grid.SetRow(title, 0);
-            root.Children.Add(title);
-
-            var summary = new TextBlock
-            {
-                Margin = new Thickness(0, 6, 0, 18),
-                Text = $"SKU: {product.Sku}\nCategory: {product.Category?.Name ?? "Uncategorized"}",
-                FontSize = 13,
-                Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105))
-            };
-            Grid.SetRow(summary, 1);
-            root.Children.Add(summary);
+            Grid.SetRow(title, 0); root.Children.Add(title);
+            var summary = new TextBlock { Margin = new Thickness(0, 6, 0, 18), Text = $"SKU: {product.Sku}\nCategory: {categoryName ?? "Uncategorized"}", FontSize = 13, Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)) };
+            Grid.SetRow(summary, 1); root.Children.Add(summary);
 
             var details = new StackPanel();
             foreach (var unit in product.Units.Where(x => x.IsActive).OrderByDescending(x => x.IsBaseUnit))
             {
-                var card = new Border
-                {
-                    Background = Brushes.White,
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(5),
-                    Padding = new Thickness(14),
-                    Margin = new Thickness(0, 0, 0, 8)
-                };
+                var card = new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 8) };
                 var grid = new Grid();
                 for (var i = 0; i < 5; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
                 grid.Children.Add(new TextBlock { Text = $"{unit.Name} ({unit.Abbreviation}){(unit.IsBaseUnit ? " · BASE" : "")}", FontWeight = FontWeights.SemiBold });
@@ -202,32 +157,17 @@ public partial class PosWindow
                 AddDialogMetric(grid, 2, "Retail", unit.SellingPrice);
                 AddDialogMetric(grid, 3, "Wholesale", unit.WholesalePrice);
                 AddDialogMetric(grid, 4, "Wholesale+", unit.WholesaleWholesalePrice);
-                card.Child = grid;
-                details.Children.Add(card);
+                card.Child = grid; details.Children.Add(card);
             }
-
-            var stockHeader = new TextBlock { Text = "Availability by Warehouse", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 10, 0, 8) };
-            details.Children.Add(stockHeader);
-            var stockList = new ListView { ItemsSource = stocks, Height = 180, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1) };
-            stockList.ItemTemplate = new DataTemplate { VisualTree = new FrameworkElementFactory(typeof(Grid)) };
-            // Use a simple textual view so the dialog stays dependency-free.
-            stockList.ItemTemplate = BuildStockTemplate();
+            details.Children.Add(new TextBlock { Text = "Availability by Warehouse", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 10, 0, 8) });
+            var stockList = new ListView { ItemsSource = stocks, Height = 180, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1), ItemTemplate = BuildStockTemplate() };
             details.Children.Add(stockList);
-            Grid.SetRow(details, 2);
-            root.Children.Add(details);
-
+            Grid.SetRow(details, 2); root.Children.Add(details);
             var close = new Button { Content = "Close", Width = 100, Height = 38, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Background = new SolidColorBrush(Color.FromRgb(32, 166, 74)), Foreground = Brushes.White, BorderThickness = new Thickness(0), FontWeight = FontWeights.SemiBold };
-            close.Click += (_, _) => dialog.Close();
-            Grid.SetRow(close, 3);
-            root.Children.Add(close);
-
-            dialog.Content = root;
-            dialog.ShowDialog();
+            close.Click += (_, _) => dialog.Close(); Grid.SetRow(close, 3); root.Children.Add(close);
+            dialog.Content = root; dialog.ShowDialog();
         }
-        catch (Exception ex)
-        {
-            Status(ex.InnerException?.Message ?? ex.Message, false);
-        }
+        catch (Exception ex) { Status(ex.InnerException?.Message ?? ex.Message, false); }
     }
 
     private static void AddDialogMetric(Grid grid, int column, string label, decimal value)
@@ -235,8 +175,7 @@ public partial class PosWindow
         var panel = new StackPanel { Margin = new Thickness(18, 0, 0, 0) };
         panel.Children.Add(new TextBlock { Text = label, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)) });
         panel.Children.Add(new TextBlock { Text = value.ToString("N2", CultureInfo.CurrentCulture), FontSize = 13, FontWeight = FontWeights.SemiBold });
-        Grid.SetColumn(panel, column);
-        grid.Children.Add(panel);
+        Grid.SetColumn(panel, column); grid.Children.Add(panel);
     }
 
     private static DataTemplate BuildStockTemplate()
@@ -244,36 +183,26 @@ public partial class PosWindow
         var template = new DataTemplate();
         var panel = new FrameworkElementFactory(typeof(Grid));
         panel.SetValue(Grid.MarginProperty, new Thickness(10, 6));
-        var name = new FrameworkElementFactory(typeof(TextBlock));
-        name.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(ProductStockRow.Warehouse)));
-        panel.AppendChild(name);
-        var qty = new FrameworkElementFactory(typeof(TextBlock));
-        qty.SetValue(Grid.HorizontalAlignmentProperty, HorizontalAlignment.Right);
-        qty.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(ProductStockRow.Quantity)) { StringFormat = "N3" });
-        panel.AppendChild(qty);
+        panel.AppendChild(BoundText(nameof(ProductStockRow.Warehouse), 0, false));
+        panel.AppendChild(BoundText(nameof(ProductStockRow.Quantity), 1, true, "N3"));
         template.VisualTree = panel;
         return template;
     }
 
+    private static FrameworkElementFactory BoundText(string property, int column, bool right, string? format = null)
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetValue(Grid.ColumnProperty, column);
+        text.SetValue(TextBlock.HorizontalAlignmentProperty, right ? HorizontalAlignment.Right : HorizontalAlignment.Left);
+        text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(property) { StringFormat = format });
+        return text;
+    }
+
     private async void ClosePos_Click(object sender, RoutedEventArgs e)
     {
-        if (_cart.Count > 0)
-        {
-            var result = MessageBox.Show(this, "The current cart contains items. Close the POS anyway?", "Close POS", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result != MessageBoxResult.Yes) return;
-        }
-
+        if (_cart.Count > 0 && MessageBox.Show(this, "The current cart contains items. Close the POS anyway?", "Close POS", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         var passwordBox = new PasswordBox { Height = 38, Margin = new Thickness(0, 8, 0, 0), FontSize = 16, Padding = new Thickness(10) };
-        var dialog = new Window
-        {
-            Owner = this,
-            Title = "Authorize Close POS",
-            Width = 380,
-            Height = 210,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Background = Brushes.White
-        };
+        var dialog = new Window { Owner = this, Title = "Authorize Close POS", Width = 380, Height = 210, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = Brushes.White };
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(new TextBlock { Text = "Enter your password to close the cashier screen.", FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(passwordBox);
@@ -289,15 +218,9 @@ public partial class PosWindow
             var stored = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == user.Id);
             var valid = stored is not null && new PasswordHasher().Verify(passwordBox.Password, stored.PasswordHash);
             if (!valid) { MessageBox.Show(dialog, "Invalid password.", "Close POS", MessageBoxButton.OK, MessageBoxImage.Error); passwordBox.Clear(); passwordBox.Focus(); return; }
-            dialog.DialogResult = true;
-            dialog.Close();
-            Close();
+            dialog.DialogResult = true; dialog.Close(); Close();
         };
-        buttons.Children.Add(cancel);
-        buttons.Children.Add(confirm);
-        panel.Children.Add(buttons);
-        dialog.Content = panel;
-        dialog.ShowDialog();
+        buttons.Children.Add(cancel); buttons.Children.Add(confirm); panel.Children.Add(buttons); dialog.Content = panel; dialog.ShowDialog();
     }
 
     private sealed class ProductStockRow
