@@ -24,7 +24,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Product>(e => { e.HasKey(x => x.Id); e.Property(x => x.Sku).HasMaxLength(64).IsRequired(); e.Property(x => x.Name).HasMaxLength(200).IsRequired(); e.Property(x => x.NameArabic).HasMaxLength(200); e.HasIndex(x => x.Sku).IsUnique(); e.HasOne<ProductUnit>().WithMany().HasForeignKey(x => x.BaseUnitId).OnDelete(DeleteBehavior.Restrict); e.HasOne<Category>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict); e.HasMany(x => x.Units).WithOne(x => x.Product).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict); });
+        // BaseUnitId is intentionally persisted as a scalar reference rather than an EF FK.
+        // ProductUnit.ProductId already establishes ownership from unit -> product; making
+        // Product.BaseUnitId another FK to ProductUnit creates a required insert cycle that
+        // SQLite cannot persist atomically. Domain services validate that BaseUnitId belongs
+        // to the same product and is the designated base unit.
+        modelBuilder.Entity<Product>(e => { e.HasKey(x => x.Id); e.Property(x => x.Sku).HasMaxLength(64).IsRequired(); e.Property(x => x.Name).HasMaxLength(200).IsRequired(); e.Property(x => x.NameArabic).HasMaxLength(200); e.HasIndex(x => x.Sku).IsUnique(); e.HasOne<Category>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict); e.HasMany(x => x.Units).WithOne(x => x.Product).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict); });
         modelBuilder.Entity<Category>(e => { e.HasKey(x => x.Id); e.Property(x => x.Name).HasMaxLength(150).IsRequired(); e.Property(x => x.NameArabic).HasMaxLength(150); e.HasIndex(x => new { x.ParentCategoryId, x.Name }).IsUnique(); });
         modelBuilder.Entity<ProductUnit>(e => { e.HasKey(x => x.Id); e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.Property(x => x.Abbreviation).HasMaxLength(20).IsRequired(); e.Property(x => x.Barcode).HasMaxLength(100); e.Property(x => x.ConversionFactorToBase).HasPrecision(18, 6); e.Property(x => x.SellingPrice).HasPrecision(18, 2); e.Property(x => x.PurchasePrice).HasPrecision(18, 2); e.HasIndex(x => x.Barcode).IsUnique().HasFilter("Barcode IS NOT NULL"); e.HasIndex(x => new { x.ProductId, x.Name }).IsUnique(); });
         modelBuilder.Entity<UnitConversionRule>(e => { e.HasKey(x => x.Id); e.Property(x => x.Factor).HasPrecision(18, 6); e.HasIndex(x => new { x.ProductId, x.FromUnitId, x.ToUnitId }).IsUnique(); });
