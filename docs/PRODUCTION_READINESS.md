@@ -54,7 +54,7 @@ This document is a release gate, not a feature wishlist. A release may only be d
 - [x] Sales/inventory report query services
 - [x] Customer/supplier account statement query services and UI
 - [x] Reports/export UI
-- [ ] Opening stock workflow UI
+- [x] Opening stock workflow UI
 - [ ] Full POS discounts/promotions/tax UI
 - [ ] Receipt reprint/void workflow UI
 
