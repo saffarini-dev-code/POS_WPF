@@ -25,7 +25,7 @@ public sealed class ApplicationSeeder(AppDbContext db, IPasswordHasher passwordH
             managerRole = new Role(PermissionCatalog.Manager);
             db.Roles.Add(managerRole);
             await db.SaveChangesAsync(cancellationToken);
-            foreach (var code in PermissionCatalog.All.Where(x => x != "Settings.Users" || x != "Settings.Roles")) db.RolePermissions.Add(new RolePermission(managerRole.Id, code));
+            foreach (var code in PermissionCatalog.All.Where(x => x != "Settings.Users" && x != "Settings.Roles")) db.RolePermissions.Add(new RolePermission(managerRole.Id, code));
         }
 
         var admin = await db.Users.SingleOrDefaultAsync(x => x.Username == "admin", cancellationToken);
