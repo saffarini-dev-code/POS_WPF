@@ -42,14 +42,19 @@ public partial class ProductManagementWindow : Window
         {
             await _permissions.DemandAsync(_selectedId.HasValue ? "Products.Edit" : "Products.Create"); if (string.IsNullOrWhiteSpace(SkuBox.Text) || string.IsNullOrWhiteSpace(NameBox.Text)) throw new InvalidOperationException("SKU and product name are required."); if (_units.Count == 0) throw new InvalidOperationException("A product must have at least one unit."); if (CategoryBox.SelectedValue is not Guid categoryId) throw new InvalidOperationException("Select a product category."); if (_units.Count(x => x.IsBaseUnit) != 1) throw new InvalidOperationException("Exactly one unit must be the base unit.");
             if (!decimal.TryParse(OpeningStockBox.Text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out var openingStock) || openingStock < 0) throw new InvalidOperationException("Opening stock must be a valid non-negative number.");
-            if (!_selectedId.HasValue && WarehouseBox.SelectedValue is not Guid warehouseId) throw new InvalidOperationException("Select the opening-stock warehouse.");
+            Guid? warehouseId = null;
+            if (!_selectedId.HasValue)
+            {
+                if (WarehouseBox.SelectedValue is not Guid selectedWarehouseId) throw new InvalidOperationException("Select the opening-stock warehouse.");
+                warehouseId = selectedWarehouseId;
+            }
             foreach (var unit in _units) { if (string.IsNullOrWhiteSpace(unit.Name) || string.IsNullOrWhiteSpace(unit.Abbreviation)) throw new InvalidOperationException("Every unit needs a name and abbreviation."); if (unit.ConversionFactorToBase <= 0) throw new InvalidOperationException($"Invalid conversion factor for {unit.Name}."); if (unit.PurchasePrice < 0 || unit.SellingPrice < 0 || unit.WholesalePrice < 0 || unit.WholesaleWholesalePrice < 0) throw new InvalidOperationException($"Prices cannot be negative for {unit.Name}."); }
             var productId = _selectedId ?? Guid.NewGuid(); var product = new Product { Id = productId, Sku = SkuBox.Text.Trim(), Name = NameBox.Text.Trim(), NameArabic = ArabicNameBox.Text.Trim(), CategoryId = categoryId, IsActive = true, Units = _units }; _conversion.ValidateProductUnits(product); var baseUnit = _units.Single(x => x.IsBaseUnit); if (baseUnit.Id == Guid.Empty) baseUnit.Id = Guid.NewGuid(); product.BaseUnitId = baseUnit.Id; foreach (var unit in _units) { if (unit.Id == Guid.Empty) unit.Id = Guid.NewGuid(); unit.ProductId = productId; }
             await using var db = await _dbFactory.CreateDbContextAsync();
             if (_selectedId is null)
             {
                 db.Products.Add(new Product { Id = productId, Sku = product.Sku, Name = product.Name, NameArabic = product.NameArabic, CategoryId = categoryId, IsActive = true, BaseUnitId = baseUnit.Id }); db.ProductUnits.AddRange(_units);
-                if (openingStock > 0) db.InventoryTransactions.Add(new InventoryTransaction { ProductId = productId, UnitId = baseUnit.Id, TransactionQuantity = openingStock, ConversionFactor = baseUnit.ConversionFactorToBase, BaseQuantity = openingStock * baseUnit.ConversionFactorToBase, TransactionType = InventoryTransactionType.OpeningStock, Reference = $"OPEN-{product.Sku}", WarehouseId = warehouseId, BranchId = (await db.Warehouses.Where(x => x.Id == warehouseId).Select(x => (Guid?)x.BranchId).FirstOrDefaultAsync()), UserId = _session.CurrentUser?.Id });
+                if (openingStock > 0 && warehouseId.HasValue) db.InventoryTransactions.Add(new InventoryTransaction { ProductId = productId, UnitId = baseUnit.Id, TransactionQuantity = openingStock, ConversionFactor = baseUnit.ConversionFactorToBase, BaseQuantity = openingStock * baseUnit.ConversionFactorToBase, TransactionType = InventoryTransactionType.OpeningStock, Reference = $"OPEN-{product.Sku}", WarehouseId = warehouseId.Value, BranchId = (await db.Warehouses.Where(x => x.Id == warehouseId.Value).Select(x => (Guid?)x.BranchId).FirstOrDefaultAsync()), UserId = _session.CurrentUser?.Id });
             }
             else
             {
