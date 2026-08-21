@@ -42,14 +42,7 @@ public partial class PosWindow
 
     private void AddCategoryTab(string caption, Guid? categoryId, bool selected)
     {
-        var button = new Button
-        {
-            Content = caption,
-            Tag = categoryId,
-            Style = (Style)FindResource("CategoryTabStyle"),
-            Background = selected ? new SolidColorBrush(Color.FromRgb(32, 166, 74)) : Brushes.White,
-            Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85))
-        };
+        var button = new Button { Content = caption, Tag = categoryId, Style = (Style)FindResource("CategoryTabStyle"), Background = selected ? new SolidColorBrush(Color.FromRgb(32, 166, 74)) : Brushes.White, Foreground = selected ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85)) };
         button.Click += CategoryTab_Click;
         CategoryTabsPanel.Children.Add(button);
     }
@@ -93,6 +86,7 @@ public partial class PosWindow
         if (target == PaymentBox && target.Text.Length >= 12) return;
         target.AppendText(value);
         target.CaretIndex = target.Text.Length;
+        UpdateTouchChange();
     }
 
     private void KeypadBackspace_Click(object sender, RoutedEventArgs e)
@@ -101,6 +95,7 @@ public partial class PosWindow
         if (target.Text.Length == 0) return;
         target.Text = target.Text[..^1];
         target.CaretIndex = target.Text.Length;
+        UpdateTouchChange();
     }
 
     private void KeypadClear_Click(object sender, RoutedEventArgs e)
@@ -108,6 +103,26 @@ public partial class PosWindow
         var target = _keypadTarget ?? PaymentBox;
         target.Clear();
         target.Focus();
+        UpdateTouchChange();
+    }
+
+    private void PaymentBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateTouchChange();
+
+    private void UpdateTouchChange()
+    {
+        if (!decimal.TryParse(PaymentBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var received)) received = 0;
+        if (!decimal.TryParse(TotalText.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var total)) total = 0;
+        ChangeText.Text = Math.Max(0, received - total).ToString("N2", CultureInfo.CurrentCulture);
+    }
+
+    private async void CartDiscount_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: object data } && data.GetType().Name == "CartItem")
+        {
+            var item = data;
+            var method = typeof(PosWindow).GetMethod("RecalculateLineAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (method?.Invoke(this, [item]) is Task task) await task;
+        }
     }
 
     private void PosWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -122,6 +137,7 @@ public partial class PosWindow
 
     private async void CheckProduct_Click(object sender, RoutedEventArgs e)
     {
+        e.Handled = true;
         if (sender is not FrameworkElement { DataContext: PopularProduct item }) return;
         try
         {
@@ -160,8 +176,7 @@ public partial class PosWindow
                 card.Child = grid; details.Children.Add(card);
             }
             details.Children.Add(new TextBlock { Text = "Availability by Warehouse", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 10, 0, 8) });
-            var stockList = new ListView { ItemsSource = stocks, Height = 180, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1), ItemTemplate = BuildStockTemplate() };
-            details.Children.Add(stockList);
+            details.Children.Add(new ListView { ItemsSource = stocks, Height = 180, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1), ItemTemplate = BuildStockTemplate() });
             Grid.SetRow(details, 2); root.Children.Add(details);
             var close = new Button { Content = "Close", Width = 100, Height = 38, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Background = new SolidColorBrush(Color.FromRgb(32, 166, 74)), Foreground = Brushes.White, BorderThickness = new Thickness(0), FontWeight = FontWeights.SemiBold };
             close.Click += (_, _) => dialog.Close(); Grid.SetRow(close, 3); root.Children.Add(close);
