@@ -1,0 +1,30 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Test results
+TestResults/
+*.trx
+
+# Local development databases
+src/pos-local.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# OS files
+.DS_Store
+Thumbs.db
