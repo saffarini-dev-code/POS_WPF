@@ -187,18 +187,22 @@ public partial class PosWindow
         var dialog = new Window
         {
             Owner = this,
-            Width = 430,
-            Height = 205,
+            Width = 384,
+            Height = 270,
+            MinWidth = 384,
+            MinHeight = 270,
+            MaxWidth = 384,
+            MaxHeight = 270,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.NoResize,
-            WindowStyle = WindowStyle.ToolWindow,
-            Title = "تأكيد حذف المنتج",
-            FlowDirection = FlowDirection.RightToLeft,
-            Background = Brushes.White,
-            ShowInTaskbar = false
+            WindowStyle = WindowStyle.None,
+            AllowsTransparency = true,
+            Background = Brushes.Transparent,
+            ShowInTaskbar = false,
+            Title = "تأكيد حذف المنتج"
         };
 
-        var root = new Grid { Margin = new Thickness(22) };
+        var root = new Grid { Margin = new Thickness(0) };
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
@@ -211,7 +215,9 @@ public partial class PosWindow
             FontSize = 14,
             Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
             TextWrapping = TextWrapping.Wrap,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Right,
+            FlowDirection = FlowDirection.RightToLeft
         };
         Grid.SetRow(text, 0);
         root.Children.Add(text);
@@ -220,28 +226,32 @@ public partial class PosWindow
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Left,
-            FlowDirection = FlowDirection.RightToLeft
+            FlowDirection = FlowDirection.RightToLeft,
+            Margin = new Thickness(0, 20, 0, 0)
         };
         var ok = new Button
         {
             Content = "موافق",
-            Width = 95,
-            Height = 36,
+            Width = 110,
+            Height = 42,
             Margin = new Thickness(0, 0, 8, 0),
-            Background = new SolidColorBrush(Color.FromRgb(22, 163, 74)),
+            Background = new SolidColorBrush(Color.FromRgb(32, 166, 74)),
             Foreground = Brushes.White,
-            BorderThickness = new Thickness(0),
-            FontWeight = FontWeights.SemiBold
+            BorderBrush = new SolidColorBrush(Color.FromRgb(32, 166, 74)),
+            BorderThickness = new Thickness(1),
+            FontSize = 13,
+            FontWeight = FontWeights.Bold
         };
         var cancel = new Button
         {
             Content = "إلغاء",
-            Width = 95,
-            Height = 36,
+            Width = 110,
+            Height = 42,
             Background = Brushes.White,
-            Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
             BorderThickness = new Thickness(1),
+            FontSize = 13,
             FontWeight = FontWeights.SemiBold
         };
         var confirmed = false;
@@ -251,7 +261,19 @@ public partial class PosWindow
         buttons.Children.Add(cancel);
         Grid.SetRow(buttons, 1);
         root.Children.Add(buttons);
-        dialog.Content = root;
+
+        dialog.Content = new Border
+        {
+            Width = 384,
+            Height = 270,
+            Background = Brushes.White,
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(24),
+            Child = root
+        };
+
         dialog.ShowDialog();
         return confirmed;
     }
