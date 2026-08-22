@@ -29,11 +29,12 @@ public partial class PosWindow
     {
         base.OnInitialized(e);
         Loaded += TaxSettings_Loaded;
-        AttachTaxVisibilityWatcher();
         _cart.CollectionChanged += Cart_CollectionChangedForTax;
         InitializeCartUi();
         Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SelectPaymentMethod("Cash")));
     }
+
+    private void AttachTaxVisibilityWatcher() { }
 
     private void Cart_CollectionChangedForTax(object? sender, NotifyCollectionChangedEventArgs e)
     {
