@@ -60,12 +60,12 @@ public partial class PosWindow : Window
         if (sold.Count == 0)
         {
             var fallback = await db.Products.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Take(20).Include(x => x.Units).ToListAsync();
-            PopularProductsPanel.ItemsSource = fallback.Select(p => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
+            PopularProductsPanel.ItemsSource = fallback.Select(p => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
             return;
         }
         var ids = sold.Select(x => x.ProductId).ToList();
         var products = await db.Products.AsNoTracking().Where(x => ids.Contains(x.Id) && x.IsActive).Include(x => x.Units).ToListAsync();
-        PopularProductsPanel.ItemsSource = sold.Join(products, x => x.ProductId, x => x.Id, (x, p) => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, x.Sold, unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
+        PopularProductsPanel.ItemsSource = sold.Join(products, x => x.ProductId, x => x.Id, (x, p) => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, x.Sold, unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
     }
 
     private async void PopularProduct_Click(object sender, RoutedEventArgs e)

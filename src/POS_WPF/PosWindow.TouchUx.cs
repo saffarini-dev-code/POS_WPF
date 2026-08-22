@@ -9,6 +9,7 @@ using POS_WPF.Domain.Sales;
 using POS_WPF.Domain.Sales;
 using POS_WPF.Domain.Sales;
 using POS_WPF.Domain.Sales;
+using POS_WPF.Domain.Sales;
 using POS_WPF.Infrastructure.Security;
 
 namespace POS_WPF;

@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
+using POS_WPF.Domain.Settings;
 
 namespace POS_WPF;
 
@@ -28,12 +29,11 @@ public partial class PosWindow
     {
         base.OnInitialized(e);
         Loaded += TaxSettings_Loaded;
+        AttachTaxVisibilityWatcher();
         _cart.CollectionChanged += Cart_CollectionChangedForTax;
         InitializeCartUi();
         Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SelectPaymentMethod("Cash")));
     }
-
-    private void AttachTaxVisibilityWatcher() { }
 
     private void Cart_CollectionChangedForTax(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -50,7 +50,7 @@ public partial class PosWindow
             _taxEnabled = settings?.IsEnabled == true;
             _taxRate = settings?.Rate ?? 0m;
             _pricesIncludeTax = settings?.PricesIncludeTax == true;
-            _showTaxOnInvoice = _taxEnabled;
+            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;
             _taxSettingsLoaded = true;
         }
         catch
