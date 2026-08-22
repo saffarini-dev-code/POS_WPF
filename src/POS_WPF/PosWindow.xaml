@@ -132,7 +132,6 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <!-- Reference layout: cashier/order panel is 1.5x the previous 20% width. -->
                 <ColumnDefinition Width="7*"/>
                 <ColumnDefinition Width="3*"/>
             </Grid.ColumnDefinitions>
@@ -180,7 +179,7 @@
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <StackPanel Grid.Row="2" Orientation="Horizontal">
                                                 <TextBlock Text="{Binding PriceText}" FontSize="15" Foreground="#16A34A" FontWeight="Bold"/>
-                                                <TextBlock Text="  / {Binding UnitName, StringFormat=/ {0}}" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
+                                                <TextBlock Text="{Binding UnitName, StringFormat={} / {0}}" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
                                                 <TextBlock Text="{Binding SoldText}" FontSize="8" Foreground="#94A3B8"
                                                            HorizontalAlignment="Right" Margin="8,0,0,0"/>
                                             </StackPanel>
@@ -195,7 +194,6 @@
 
             <Border Grid.Column="1" Background="White" BorderBrush="#D7DEE8" BorderThickness="1,0,0,0">
                 <Grid>
-                    <!-- Keep the cart area compact so payment controls and keypad remain fully visible. -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="58"/>
                         <RowDefinition Height="*" MinHeight="260"/>
@@ -292,7 +290,7 @@
                             <Button Content="APPLY" Grid.Row="0" Grid.Column="1" Width="62" Height="30" Margin="7,0,0,0"
                                     Click="ApplyInvoiceDiscount_Click" Style="{StaticResource BaseButton}" FontSize="10"/>
                             <TextBlock Grid.Row="1" Text="Subtotal" FontSize="10" Foreground="#64748B" Margin="0,6,0,0"/>
-                            <TextBlock x:Name="SubtotalText" Grid.Row="1" Grid.Column="1" Text="0.00" FontSize="10" Margin="0,6,0,0"/>
+                            <TextBlock x:Name="SubtotalText" Grid.Row="1" Grid.Column="1" Text="0.00" FontSize="10" Margin="0,6,0,0" TextAlignment="Right"/>
                             <TextBlock Grid.Row="2" Text="Discount" FontSize="10" Foreground="#64748B">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
