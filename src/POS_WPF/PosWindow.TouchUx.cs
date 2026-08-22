@@ -1,15 +1,10 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Domain.Products;
-using POS_WPF.Domain.Sales;
-using POS_WPF.Domain.Sales;
-using POS_WPF.Domain.Sales;
-using POS_WPF.Domain.Sales;
-using POS_WPF.Domain.Sales;
 using POS_WPF.Domain.Sales;
 using POS_WPF.Infrastructure.Security;
 
@@ -185,11 +180,11 @@ public partial class PosWindow
             var categoryName = product.CategoryId.HasValue ? await db.Categories.AsNoTracking().Where(x => x.Id == product.CategoryId.Value).Select(x => x.Name).SingleOrDefaultAsync() : null;
             var stocks = await db.Warehouses.AsNoTracking().Where(w => w.IsActive).Select(w => new ProductStockRow
             {
-                Warehouse = $"{w.Code} — {w.Name}",
+                Warehouse = $"{w.Code} â€” {w.Name}",
                 Quantity = db.InventoryTransactions.Where(t => t.ProductId == product.Id && t.WarehouseId == w.Id).Sum(t => (decimal?)t.BaseQuantity) ?? 0m
             }).OrderBy(x => x.Warehouse).ToListAsync();
 
-            var dialog = new Window { Owner = this, Title = $"Check Product — {product.Name}", Width = 720, Height = 560, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)) };
+            var dialog = new Window { Owner = this, Title = $"Check Product â€” {product.Name}", Width = 720, Height = 560, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)) };
             var root = new Grid { Margin = new Thickness(24) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -205,7 +200,7 @@ public partial class PosWindow
                 var card = new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 8) };
                 var grid = new Grid();
                 for (var i = 0; i < 5; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
-                grid.Children.Add(new TextBlock { Text = $"{unit.Name} ({unit.Abbreviation}){(unit.IsBaseUnit ? " · BASE" : "")}", FontWeight = FontWeights.SemiBold });
+                grid.Children.Add(new TextBlock { Text = $"{unit.Name} ({unit.Abbreviation}){(unit.IsBaseUnit ? " Â· BASE" : "")}", FontWeight = FontWeights.SemiBold });
                 AddDialogMetric(grid, 1, "Cost", unit.PurchasePrice);
                 AddDialogMetric(grid, 2, "Retail", unit.SellingPrice);
                 AddDialogMetric(grid, 3, "Wholesale", unit.WholesalePrice);
