@@ -50,10 +50,8 @@ public sealed class SalePostingService(IDbContextFactory<AppDbContext> dbFactory
                 if (required > available)
                     throw new InvalidOperationException($"Insufficient stock for {product.Name}.");
 
-                var taxableAmount = Math.Max(0m, line.Quantity * line.UnitPrice - line.Discount);
-                var tax = taxEnabled
-                    ? CalculateTax(taxableAmount, taxSettings!.Rate, taxSettings.PricesIncludeTax)
-                    : 0m;
+                // Tax is calculated once on the invoice taxable total, not per product line.
+                var tax = 0m;
 
                 sale.AddLine(
                     product.Id,
@@ -79,6 +77,12 @@ public sealed class SalePostingService(IDbContextFactory<AppDbContext> dbFactory
                     UserId = request.CashierId
                 });
             }
+
+            var invoiceTaxableAmount = Math.Max(0m, sale.Subtotal - sale.Discount);
+            var invoiceTax = taxEnabled
+                ? CalculateTax(invoiceTaxableAmount, taxSettings!.Rate, taxSettings.PricesIncludeTax)
+                : 0m;
+            sale.SetTax(invoiceTax);
 
             foreach (var payment in request.Payments)
                 sale.AddPayment(payment.Method, payment.Amount);

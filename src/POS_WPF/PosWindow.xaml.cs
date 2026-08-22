@@ -60,12 +60,12 @@ public partial class PosWindow : Window
         if (sold.Count == 0)
         {
             var fallback = await db.Products.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Take(20).Include(x => x.Units).ToListAsync();
-            PopularProductsPanel.ItemsSource = fallback.Select(p => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Name ?? "PCS"); }).ToList();
+            PopularProductsPanel.ItemsSource = fallback.Select(p => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
             return;
         }
         var ids = sold.Select(x => x.ProductId).ToList();
         var products = await db.Products.AsNoTracking().Where(x => ids.Contains(x.Id) && x.IsActive).Include(x => x.Units).ToListAsync();
-        PopularProductsPanel.ItemsSource = sold.Join(products, x => x.ProductId, x => x.Id, (x, p) => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, x.Sold, unit?.Name ?? "PCS"); }).ToList();
+        PopularProductsPanel.ItemsSource = sold.Join(products, x => x.ProductId, x => x.Id, (x, p) => { var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit); return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, x.Sold, unit?.Abbreviation ?? unit?.Name ?? "PCS"); }).ToList();
     }
 
     private async void PopularProduct_Click(object sender, RoutedEventArgs e)
@@ -202,7 +202,7 @@ public partial class PosWindow : Window
         var max = Math.Max(0, _cart.Sum(x => x.Quantity * x.UnitPrice - x.ManualDiscount - x.PromotionDiscount + x.Tax));
         _invoiceDiscount = Math.Min(discount, max);
         InvoiceDiscountBox.Text = _invoiceDiscount.ToString("N2", CultureInfo.CurrentCulture);
-        RefreshTotal();
+        RefreshTaxAndTotals();
         Status("Invoice discount applied.", true);
     }
 
@@ -289,7 +289,7 @@ public partial class PosWindow : Window
 
     private async void Complete_Click(object sender, RoutedEventArgs e)
     {
-        var total = Math.Max(0, _cart.Sum(x => x.LineTotal) - _invoiceDiscount);
+        var total = GetInvoiceTotal();
         if (_cart.Count == 0) { Status("Cart is empty.", false); return; }
         if (!decimal.TryParse(PaymentBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var payment) || payment < total)
         {
@@ -312,7 +312,7 @@ public partial class PosWindow : Window
             if (_session.CurrentUser is null) { Status("Session expired. Please sign in again.", false); return; }
 
             var number = $"S-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
-            var requests = _cart.Select(x => new SaleLineRequest(x.ProductId, x.UnitId, x.Quantity, x.UnitPrice, x.Discount, x.Tax)).ToList();
+            var requests = _cart.Select(x => new SaleLineRequest(x.ProductId, x.UnitId, x.Quantity, x.UnitPrice, x.Discount, 0m)).ToList();
             if (_invoiceDiscount > 0 && requests.Count > 0) { var first = requests[0]; requests[0] = first with { Discount = first.Discount + _invoiceDiscount }; }
             var request = new SalePostingRequest(branch.Id, warehouse.Id, terminal.Id, register.Id, _session.CurrentUser.Id, number, null, requests, [new SalePaymentRequest(_paymentMethod, payment)]);
             var result = await _posting.PostAsync(request);
@@ -356,7 +356,7 @@ public partial class PosWindow : Window
     {
         var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
         var discount = _cart.Sum(x => x.Discount) + _invoiceDiscount;
-        var tax = _cart.Sum(x => x.Tax);
+        var tax = _invoiceTax;
         var taxLine = tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;
         return $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}SUBTOTAL: {subtotal:N2}{Environment.NewLine}DISCOUNT: {discount:N2}{Environment.NewLine}{taxLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";
     }
@@ -370,7 +370,7 @@ public partial class PosWindow : Window
         }
         var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
         var lineDiscount = _cart.Sum(x => x.Discount);
-        var tax = _cart.Sum(x => x.Tax);
+        var tax = _invoiceTax;
         var maxInvoice = Math.Max(0, subtotal - lineDiscount + tax);
         if (_invoiceDiscount > maxInvoice) _invoiceDiscount = maxInvoice;
         var total = Math.Max(0, subtotal - lineDiscount - _invoiceDiscount + tax);
@@ -426,6 +426,6 @@ public partial class PosWindow : Window
         public decimal AppliedPromotionQuantity { get; set; }
         public string? PromotionName { get; set; }
         public decimal Discount => ManualDiscount + PromotionDiscount;
-        public decimal LineTotal => Math.Max(0, Quantity * UnitPrice - Discount + Tax);
+        public decimal LineTotal => Math.Max(0, Quantity * UnitPrice - Discount);
     }
 }

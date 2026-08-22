@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Domain.Products;
+using POS_WPF.Domain.Sales;
 using POS_WPF.Infrastructure.Security;
 
 namespace POS_WPF;
@@ -57,19 +58,55 @@ public partial class PosWindow
             child.Background = active ? new SolidColorBrush(Color.FromRgb(32, 166, 74)) : Brushes.White;
             child.Foreground = active ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85));
         }
+
         try
         {
-            await using var db = await _dbFactory.CreateDbContextAsync();
-            var query = db.Products.AsNoTracking().Where(x => x.IsActive).Include(x => x.Units).AsQueryable();
-            if (categoryId.HasValue) query = query.Where(x => x.CategoryId == categoryId.Value);
-            var products = await query.OrderBy(x => x.Name).Take(60).ToListAsync();
-            PopularProductsPanel.ItemsSource = products.Select(p =>
-            {
-                var unit = p.Units.SingleOrDefault(u => u.Id == p.BaseUnitId) ?? p.Units.SingleOrDefault(u => u.IsBaseUnit);
-                return new PopularProduct(p.Id, unit?.Id ?? Guid.Empty, p.Sku, p.Name, unit?.SellingPrice ?? 0m, 0m, unit?.Name ?? "PCS");
-            }).ToList();
+            await LoadProductsForCategoryAsync(categoryId);
         }
-        catch (Exception ex) { Status(ex.InnerException?.Message ?? ex.Message, false); }
+        catch (Exception ex)
+        {
+            Status(ex.InnerException?.Message ?? ex.Message, false);
+        }
+    }
+
+    private async Task LoadProductsForCategoryAsync(Guid? categoryId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var sold = await db.Set<SaleLine>()
+            .Where(l => db.Sales.Any(s => s.Id == EF.Property<Guid>(l, "SaleId") && s.Status == SaleStatus.Completed))
+            .Where(l => db.Products.Any(p => p.Id == l.ProductId && p.IsActive && (!categoryId.HasValue || p.CategoryId == categoryId.Value)))
+            .GroupBy(l => l.ProductId)
+            .Select(g => new { ProductId = g.Key, Sold = g.Sum(x => x.Quantity * x.ConversionFactor) })
+            .OrderByDescending(x => x.Sold)
+            .ThenBy(x => x.ProductId)
+            .Take(60)
+            .ToListAsync();
+
+        var ids = sold.Select(x => x.ProductId).ToList();
+        var products = await db.Products.AsNoTracking()
+            .Where(x => x.IsActive && (!categoryId.HasValue || x.CategoryId == categoryId.Value))
+            .Include(x => x.Units)
+            .ToListAsync();
+
+        var soldProducts = sold
+            .Join(products, x => x.ProductId, x => x.Id, (x, p) => new { p, x.Sold })
+            .Select(x => CreatePopularProduct(x.p, x.Sold))
+            .ToList();
+
+        var soldIds = soldProducts.Select(x => x.ProductId).ToHashSet();
+        var fallback = products
+            .Where(p => !soldIds.Contains(p.Id))
+            .OrderBy(p => p.Name)
+            .Select(p => CreatePopularProduct(p, 0m));
+
+        PopularProductsPanel.ItemsSource = soldProducts.Concat(fallback).Take(60).ToList();
+    }
+
+    private static PopularProduct CreatePopularProduct(Product product, decimal sold)
+    {
+        var unit = product.Units.SingleOrDefault(u => u.Id == product.BaseUnitId) ?? product.Units.SingleOrDefault(u => u.IsBaseUnit);
+        return new PopularProduct(product.Id, unit?.Id ?? Guid.Empty, product.Sku, product.Name, unit?.SellingPrice ?? 0m, sold, unit?.Abbreviation ?? unit?.Name ?? "PCS");
     }
 
     private void KeypadTarget_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)

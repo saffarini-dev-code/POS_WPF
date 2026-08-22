@@ -19,7 +19,12 @@ public sealed class ApplicationSeeder(AppDbContext db, IPasswordHasher passwordH
             branch = new Branch("MAIN", "Main Branch"); db.Branches.Add(branch); await db.SaveChangesAsync(cancellationToken); db.Warehouses.Add(new Warehouse(branch.Id, "MAIN", "Main Warehouse")); db.Terminals.Add(new Terminal(branch.Id, "POS-01", "POS Terminal 01")); db.CashRegisters.Add(new CashRegister(branch.Id, "REG-01", "Cash Register 01"));
         }
         if (!await db.StoreSettings.AnyAsync(x => x.BranchId == branch.Id, cancellationToken)) { var settings = new StoreSettings("Retail POS", "JOD"); settings.AssignBranch(branch.Id); db.StoreSettings.Add(settings); }
-        if (!await db.InvoiceSettings.AnyAsync(cancellationToken)) db.InvoiceSettings.Add(new InvoiceSettings()); if (!await db.TaxSettings.AnyAsync(cancellationToken)) db.TaxSettings.Add(new TaxSettings());
+        if (!await db.InvoiceSettings.AnyAsync(cancellationToken)) db.InvoiceSettings.Add(new InvoiceSettings()); if (!await db.TaxSettings.AnyAsync(cancellationToken))
+        {
+            var taxSettings = new TaxSettings();
+            taxSettings.Configure(false, 0m, false, true);
+            db.TaxSettings.Add(taxSettings);
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
     private async Task EnsureRoleAsync(string name, IEnumerable<string> permissions, CancellationToken cancellationToken) { var role = await db.Roles.SingleOrDefaultAsync(x => x.Name == name, cancellationToken); if (role is null) { role = new Role(name); db.Roles.Add(role); await db.SaveChangesAsync(cancellationToken); } var existing = await db.RolePermissions.Where(x => x.RoleId == role.Id).Select(x => x.PermissionCode).ToListAsync(cancellationToken); foreach (var permission in permissions.Where(x => !existing.Contains(x))) db.RolePermissions.Add(new RolePermission(role.Id, permission)); await db.SaveChangesAsync(cancellationToken); }

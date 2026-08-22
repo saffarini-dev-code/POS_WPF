@@ -30,6 +30,13 @@ public sealed class Sale : Entity
         _lines.Add(new SaleLine(productId, unitId, description, quantity, conversionFactor, unitPrice, discount, tax));
         Recalculate();
     }
+    public void SetTax(decimal tax)
+    {
+        if (tax < 0) throw new ArgumentOutOfRangeException(nameof(tax));
+        Tax = Math.Round(tax, 2, MidpointRounding.AwayFromZero);
+        Total = Math.Round(Subtotal - Discount + Tax, 2, MidpointRounding.AwayFromZero);
+    }
+
     public void AddPayment(string method, decimal amount)
     {
         if (string.IsNullOrWhiteSpace(method) || amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));

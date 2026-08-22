@@ -47,6 +47,8 @@
             <Setter Property="Padding" Value="12"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
         </Style>
         <Style x:Key="PayButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButton}">
             <Setter Property="Height" Value="30"/>
@@ -160,13 +162,13 @@
 
                 <Grid Grid.Row="2" Margin="0,13,0,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="PopularProductsPanel">
+                        <ItemsControl x:Name="PopularProductsPanel" HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Left">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Style="{StaticResource ProductCardStyle}" Click="PopularProduct_Click">
+                                    <Button Style="{StaticResource ProductCardStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Click="PopularProduct_Click">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -178,7 +180,7 @@
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <StackPanel Grid.Row="2" Orientation="Horizontal">
                                                 <TextBlock Text="{Binding PriceText}" FontSize="15" Foreground="#16A34A" FontWeight="Bold"/>
-                                                <TextBlock Text="  / unit" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
+                                                <TextBlock Text="  / {Binding UnitName, StringFormat=/ {0}}" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
                                                 <TextBlock Text="{Binding SoldText}" FontSize="8" Foreground="#94A3B8"
                                                            HorizontalAlignment="Right" Margin="8,0,0,0"/>
                                             </StackPanel>

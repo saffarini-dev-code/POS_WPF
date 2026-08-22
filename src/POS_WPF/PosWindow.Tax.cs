@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
@@ -15,25 +16,23 @@ public partial class PosWindow
     private bool _pricesIncludeTax;
     private bool _taxRefreshInProgress;
     private bool _showTaxOnInvoice;
+    private decimal _invoiceTax;
+
+    private decimal GetInvoiceTotal()
+    {
+        var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
+        var discount = _cart.Sum(x => x.Discount);
+        return Math.Max(0m, subtotal - discount - _invoiceDiscount + _invoiceTax);
+    }
 
     protected override void OnInitialized(EventArgs e)
     {
         base.OnInitialized(e);
-
         Loaded += TaxSettings_Loaded;
         AttachTaxVisibilityWatcher();
-
-        // Recalculate tax whenever products are added/removed from the cart.
-        // Quantity/discount changes are explicitly refreshed by the cart controls.
         _cart.CollectionChanged += Cart_CollectionChangedForTax;
-
-        // Load the programmatic cart template after InitializeComponent has created
-        // all named controls, while keeping the existing XAML layout intact.
         InitializeCartUi();
-
-        Loaded += (_, _) => Dispatcher.BeginInvoke(
-            DispatcherPriority.Background,
-            new Action(() => SelectPaymentMethod("Cash")));
+        Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SelectPaymentMethod("Cash")));
     }
 
     private void Cart_CollectionChangedForTax(object? sender, NotifyCollectionChangedEventArgs e)
@@ -63,14 +62,17 @@ public partial class PosWindow
             _taxSettingsLoaded = true;
         }
 
-        try
-        {
-            RefreshTaxAndTotals();
-        }
-        catch
-        {
-            // Tax is optional UI behavior; never let its initialization crash POS.
-        }
+        AttachTaxInteractionWatchers();
+        RefreshTaxAndTotals();
+    }
+
+    private void AttachTaxInteractionWatchers()
+    {
+        if (CartGrid is not null)
+            CartGrid.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals))), true);
+
+        if (InvoiceDiscountBox is not null)
+            InvoiceDiscountBox.LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals));
     }
 
     private void RefreshTaxAndTotals()
@@ -80,23 +82,27 @@ public partial class PosWindow
         try
         {
             _taxRefreshInProgress = true;
-            var invoiceDiscountRemaining = Math.Max(0m, _invoiceDiscount);
+            foreach (var item in _cart) item.Tax = 0m;
 
-            foreach (var item in _cart)
-            {
-                var lineBase = Math.Max(0m, item.Quantity * item.UnitPrice - item.ManualDiscount - item.PromotionDiscount);
-
-                if (invoiceDiscountRemaining > 0m)
-                {
-                    var applied = Math.Min(lineBase, invoiceDiscountRemaining);
-                    lineBase -= applied;
-                    invoiceDiscountRemaining -= applied;
-                }
-
-                item.Tax = _taxEnabled ? CalculateTax(lineBase) : 0m;
-            }
+            var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
+            var lineDiscount = _cart.Sum(x => x.Discount);
+            var taxableAmount = Math.Max(0m, subtotal - lineDiscount - Math.Max(0m, _invoiceDiscount));
+            _invoiceTax = _taxEnabled ? CalculateTax(taxableAmount) : 0m;
 
             RefreshTotal();
+
+            var discount = lineDiscount + _invoiceDiscount;
+            var total = Math.Max(0m, subtotal - discount + _invoiceTax);
+            SubtotalText.Text = subtotal.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            DiscountText.Text = discount.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            ReceiptSubtotalText.Text = SubtotalText.Text;
+            ReceiptDiscountText.Text = DiscountText.Text;
+            ReceiptTaxText.Text = _showTaxOnInvoice ? _invoiceTax.ToString("N2", System.Globalization.CultureInfo.CurrentCulture) : "0.00";
+            ReceiptTotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            TotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            PaymentBox.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            CartGrid.Items.Refresh();
+            ReceiptItemsPanel.Items.Refresh();
         }
         finally
         {
@@ -107,12 +113,8 @@ public partial class PosWindow
     private decimal CalculateTax(decimal taxableAmount)
     {
         if (!_taxEnabled || _taxRate <= 0m || taxableAmount <= 0m) return 0m;
-
         if (_pricesIncludeTax)
-        {
             return Math.Round(taxableAmount - taxableAmount / (1m + _taxRate / 100m), 2, MidpointRounding.AwayFromZero);
-        }
-
         return Math.Round(taxableAmount * (_taxRate / 100m), 2, MidpointRounding.AwayFromZero);
     }
 
@@ -123,7 +125,6 @@ public partial class PosWindow
             if (ReferenceEquals(source, ancestor)) return true;
             source = VisualTreeHelper.GetParent(source);
         }
-
         return false;
     }
 }
