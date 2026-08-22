@@ -40,20 +40,24 @@ public partial class PosWindow
         if (cashierBorder?.Child is not Grid cashierGrid || cashierGrid.RowDefinitions.Count < 4)
             return;
 
-        // Keep the order/scan region compact. Do not let it consume the payment area.
+        // The scan/cart area gets all remaining vertical space. Payment is a
+        // compact fixed-height block at the bottom, eliminating the large
+        // unused area below the keypad.
         cashierGrid.RowDefinitions[0].Height = new GridLength(58);
-        cashierGrid.RowDefinitions[1].Height = new GridLength(270);
-        cashierGrid.RowDefinitions[1].MinHeight = 220;
+        cashierGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+        cashierGrid.RowDefinitions[1].MinHeight = 0;
         cashierGrid.RowDefinitions[2].Height = new GridLength(115);
-        cashierGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
+        cashierGrid.RowDefinitions[3].Height = new GridLength(270);
         cashierGrid.RowDefinitions[3].MinHeight = 270;
+        cashierGrid.RowDefinitions[3].MaxHeight = 270;
 
         if (cashierGrid.Children
                 .OfType<Grid>()
                 .FirstOrDefault(x => Grid.GetRow(x) == 3) is not Grid paymentGrid)
             return;
 
-        // Balanced payment split: keypad is intentionally compact, not full-height.
+        // Keep the payment controls comfortable while reserving a dedicated,
+        // compact keypad column.
         if (paymentGrid.ColumnDefinitions.Count >= 2)
         {
             paymentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
@@ -62,14 +66,27 @@ public partial class PosWindow
 
         paymentGrid.Margin = new Thickness(8, 6, 8, 6);
 
+        // Put payment methods in the requested order: Cash, Card, Mobile.
+        // The XAML keeps the named controls for existing event handlers, so
+        // swapping Grid columns here avoids changing payment behavior.
+        var cardButton = FindDescendant<Button>(paymentGrid, "CardButton");
+        var cashButton = FindDescendant<Button>(paymentGrid, "CashButton");
+        var mobileButton = FindDescendant<Button>(paymentGrid, "MobileButton");
+        if (cashButton != null && cardButton != null && mobileButton != null)
+        {
+            Grid.SetColumn(cashButton, 0);
+            Grid.SetColumn(cardButton, 1);
+            Grid.SetColumn(mobileButton, 2);
+        }
+
         var keypad = paymentGrid.Children
             .OfType<Grid>()
             .FirstOrDefault(x => Grid.GetColumn(x) == 1);
 
         if (keypad != null)
         {
-            // Do NOT stretch the keypad vertically. The payment panel has more
-            // height than the keypad needs, so the keypad stays compact at the top.
+            // Compact keypad: four rows of keys plus Hold/Recall. It must not
+            // stretch with the payment row, otherwise the rows become separated.
             keypad.Width = 170;
             keypad.Height = 250;
             keypad.MinHeight = 0;
@@ -78,7 +95,6 @@ public partial class PosWindow
             keypad.HorizontalAlignment = HorizontalAlignment.Stretch;
             keypad.Margin = new Thickness(0);
 
-            // Four compact number rows + Hold/Recall below.
             if (keypad.RowDefinitions.Count >= 2)
             {
                 keypad.RowDefinitions[0].Height = new GridLength(210);
@@ -134,9 +150,8 @@ public partial class PosWindow
             chargeButton.MinHeight = 38;
         }
 
-        // Cash is the first and default payment method. Schedule this after the
-        // instance Loaded handler so the existing payment initialization cannot
-        // switch it back to Card.
+        // Cash is the default payment method. Run after the instance Loaded
+        // handler so the existing initialization cannot switch it back to Card.
         window.Dispatcher.BeginInvoke(
             DispatcherPriority.Loaded,
             new Action(() => window.SelectPaymentMethod("Cash")));
