@@ -16,6 +16,7 @@ public partial class PosWindow
     private decimal _taxRate;
     private bool _pricesIncludeTax;
     private bool _taxRefreshInProgress;
+    private bool _taxRefreshScheduled;
 
     protected override void OnInitialized(EventArgs e)
     {
@@ -53,13 +54,35 @@ public partial class PosWindow
     private void Tax_ButtonClicked(object sender, RoutedEventArgs e)
     {
         if (!_taxSettingsLoaded) return;
-        Dispatcher.BeginInvoke(RefreshTaxAndTotals, DispatcherPriority.Background);
+        ScheduleTaxRefresh();
     }
 
     private void Tax_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (!_taxSettingsLoaded || _taxRefreshInProgress) return;
-        Dispatcher.BeginInvoke(RefreshTaxAndTotals, DispatcherPriority.Background);
+
+        // RefreshTotal updates PaymentBox.Text. Listening to that change and
+        // immediately calling RefreshTaxAndTotals again creates an endless
+        // refresh cycle during POS startup and can terminate the process with
+        // 0x800703E9 (StackOverflowException).
+        if (ReferenceEquals(e.OriginalSource, PaymentBox) || ReferenceEquals(sender, PaymentBox))
+            return;
+
+        ScheduleTaxRefresh();
+    }
+
+    private void ScheduleTaxRefresh()
+    {
+        if (_taxRefreshScheduled || _taxRefreshInProgress) return;
+
+        _taxRefreshScheduled = true;
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() =>
+            {
+                _taxRefreshScheduled = false;
+                RefreshTaxAndTotals();
+            }));
     }
 
     private void Tax_PreviewMouseDown(object sender, MouseButtonEventArgs e)
