@@ -9,29 +9,6 @@ public partial class PosWindow
 {
     private bool _taxWatcherAttached;
 
-    protected override void OnInitialized(EventArgs e)
-    {
-        base.OnInitialized(e);
-
-        // Keep the approved cashier composition. The XAML owns the visual tree;
-        // this only sets the minimum vertical space required by payment + keypad.
-        if (Content is Grid root && root.RowDefinitions.Count >= 3)
-        {
-            var workspace = root.Children.OfType<Grid>().FirstOrDefault(x => Grid.GetRow(x) == 1);
-            var rightPanel = workspace?.Children
-                .OfType<Border>()
-                .FirstOrDefault(x => Grid.GetColumn(x) == 1)
-                ?.Child as Grid;
-
-            if (rightPanel is not null && rightPanel.RowDefinitions.Count >= 4)
-            {
-                rightPanel.RowDefinitions[3].Height = new GridLength(210);
-            }
-        }
-
-        AttachTaxVisibilityWatcher();
-    }
-
     private void AttachTaxVisibilityWatcher()
     {
         if (_taxWatcherAttached || ReceiptTaxText is null) return;
