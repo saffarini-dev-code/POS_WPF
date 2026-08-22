@@ -43,7 +43,7 @@ jobs:
                   var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
                   var discount = _cart.Sum(x => x.Discount) + _invoiceDiscount;
                   var tax = _cart.Sum(x => x.Tax);
-                  var taxLine = _showTaxOnInvoice && tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;
+                  var taxLine = tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;
                   return $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}SUBTOTAL: {subtotal:N2}{Environment.NewLine}DISCOUNT: {discount:N2}{Environment.NewLine}{taxLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";
               }
           '@
