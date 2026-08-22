@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -24,6 +25,7 @@ public partial class PosWindow
         AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(Tax_ButtonClicked), true);
         AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler(Tax_TextChanged), true);
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(Tax_PreviewMouseDown), true);
+        AttachTaxVisibilityWatcher();
     }
 
     private async void TaxSettings_Loaded(object? sender, RoutedEventArgs e)
