@@ -1,0 +1,161 @@
+name: Apply POS aggregate tax and product layout fixes
+
+on:
+  push:
+    branches: [ ci-production ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ci-production
+          fetch-depth: 0
+
+      - name: Apply source fixes
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          import subprocess
+
+          root = Path.cwd()
+
+          def edit(path, transform):
+              p = root / path
+              text = p.read_text(encoding='utf-8')
+              new = transform(text)
+              if new != text:
+                  p.write_text(new, encoding='utf-8')
+                  print(f'updated {path}')
+              else:
+                  print(f'unchanged {path}')
+
+          marker = 'POS_AGGREGATE_TAX_FIX_V3'
+          xaml_cs = root / 'src/POS_WPF/PosWindow.xaml.cs'
+          current = xaml_cs.read_text(encoding='utf-8')
+          if marker not in current:
+              current = current.replace(
+                  'public partial class PosWindow\n{',
+                  f'public partial class PosWindow\n{{\n    // {marker}',
+                  1)
+              current = current.replace(
+                  '_invoiceDiscount = Math.Min(discount, max);\n        InvoiceDiscountBox.Text = _invoiceDiscount.ToString("N2", CultureInfo.CurrentCulture);\n        RefreshTotal();',
+                  '_invoiceDiscount = Math.Min(discount, max);\n        InvoiceDiscountBox.Text = _invoiceDiscount.ToString("N2", CultureInfo.CurrentCulture);\n        RefreshTaxAndTotals();',
+                  1)
+              current = current.replace(
+                  'var total = Math.Max(0, _cart.Sum(x => x.LineTotal) - _invoiceDiscount);',
+                  'var total = GetInvoiceTotal();',
+                  1)
+              current = current.replace(
+                  'new SaleLineRequest(x.ProductId, x.UnitId, x.Quantity, x.UnitPrice, x.Discount, x.Tax)',
+                  'new SaleLineRequest(x.ProductId, x.UnitId, x.Quantity, x.UnitPrice, x.Discount, 0m)',
+                  1)
+              current = current.replace(
+                  'var tax = _cart.Sum(x => x.Tax);\n        var taxLine = tax > 0m',
+                  'var tax = _invoiceTax;\n        var taxLine = tax > 0m',
+                  1)
+              current = current.replace(
+                  'var tax = _cart.Sum(x => x.Tax);\n        var maxInvoice = Math.Max(0, subtotal - lineDiscount + tax);',
+                  'var tax = _invoiceTax;\n        var maxInvoice = Math.Max(0, subtotal - lineDiscount + tax);',
+                  1)
+              current = current.replace(
+                  'public decimal LineTotal => Math.Max(0, Quantity * UnitPrice - Discount + Tax);',
+                  'public decimal LineTotal => Math.Max(0, Quantity * UnitPrice - Discount);',
+                  1)
+              current = current.replace('unit?.Name ?? "PCS"', 'unit?.Abbreviation ?? unit?.Name ?? "PCS"')
+              xaml_cs.write_text(current, encoding='utf-8')
+
+          def replace_exact(path, old, new):
+              edit(path, lambda t: t.replace(old, new, 1))
+
+          replace_exact(
+              'src/POS_WPF/Domain/Settings/StoreSettings.cs',
+              'public bool IsEnabled { get; private set; } = true;',
+              'public bool IsEnabled { get; private set; } = false;')
+
+          replace_exact(
+              'src/POS_WPF/Infrastructure/Bootstrap/ApplicationSeeder.cs',
+              'if (!await db.TaxSettings.AnyAsync(cancellationToken)) db.TaxSettings.Add(new TaxSettings());',
+              'if (!await db.TaxSettings.AnyAsync(cancellationToken))\n        {\n            var taxSettings = new TaxSettings();\n            taxSettings.Configure(false, 0m, false, true);\n            db.TaxSettings.Add(taxSettings);\n        }')
+
+          sale_path = root / 'src/POS_WPF/Domain/Sales/SaleEntities.cs'
+          sale = sale_path.read_text(encoding='utf-8')
+          if 'public void SetTax(decimal tax)' not in sale:
+              sale = sale.replace(
+                  '    public void AddPayment(string method, decimal amount)\n',
+                  '    public void SetTax(decimal tax)\n    {\n        if (tax < 0) throw new ArgumentOutOfRangeException(nameof(tax));\n        Tax = Math.Round(tax, 2, MidpointRounding.AwayFromZero);\n        Total = Math.Round(Subtotal - Discount + Tax, 2, MidpointRounding.AwayFromZero);\n    }\n\n    public void AddPayment(string method, decimal amount)\n',
+                  1)
+              sale_path.write_text(sale, encoding='utf-8')
+
+          posting_path = root / 'src/POS_WPF/Domain/POS/SalePostingService.cs'
+          posting = posting_path.read_text(encoding='utf-8')
+          if 'var invoiceTax = taxEnabled' not in posting:
+              posting = posting.replace(
+                  '                var taxableAmount = Math.Max(0m, line.Quantity * line.UnitPrice - line.Discount);\n                var tax = taxEnabled\n                    ? CalculateTax(taxableAmount, taxSettings!.Rate, taxSettings.PricesIncludeTax)\n                    : 0m;\n\n                sale.AddLine(\n',
+                  '                // Tax is calculated once on the invoice taxable total, not per product line.\n                var tax = 0m;\n\n                sale.AddLine(\n',
+                  1)
+              posting = posting.replace(
+                  '            foreach (var payment in request.Payments)\n',
+                  '            var invoiceTaxableAmount = Math.Max(0m, sale.Subtotal - sale.Discount);\n            var invoiceTax = taxEnabled\n                ? CalculateTax(invoiceTaxableAmount, taxSettings!.Rate, taxSettings.PricesIncludeTax)\n                : 0m;\n            sale.SetTax(invoiceTax);\n\n            foreach (var payment in request.Payments)\n',
+                  1)
+              posting_path.write_text(posting, encoding='utf-8')
+
+          tax_path = root / 'src/POS_WPF/PosWindow.Tax.cs'
+          tax_code = '''using System.Collections.Specialized;\nusing System.Windows;\nusing System.Windows.Controls.Primitives;\nusing System.Windows.Media;\nusing System.Windows.Threading;\nusing Microsoft.EntityFrameworkCore;\nusing POS_WPF.Domain.Settings;\n\nnamespace POS_WPF;\n\npublic partial class PosWindow\n{\n    private bool _taxSettingsLoaded;\n    private bool _taxEnabled;\n    private decimal _taxRate;\n    private bool _pricesIncludeTax;\n    private bool _taxRefreshInProgress;\n    private bool _showTaxOnInvoice;\n    private decimal _invoiceTax;\n\n    private decimal GetInvoiceTotal()\n    {\n        var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);\n        var discount = _cart.Sum(x => x.Discount);\n        return Math.Max(0m, subtotal - discount - _invoiceDiscount + _invoiceTax);\n    }\n\n    protected override void OnInitialized(EventArgs e)\n    {\n        base.OnInitialized(e);\n        Loaded += TaxSettings_Loaded;\n        AttachTaxVisibilityWatcher();\n        _cart.CollectionChanged += Cart_CollectionChangedForTax;\n        InitializeCartUi();\n        Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SelectPaymentMethod("Cash")));\n    }\n\n    private void Cart_CollectionChangedForTax(object? sender, NotifyCollectionChangedEventArgs e)\n    {\n        if (!IsLoaded) return;\n        Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals));\n    }\n\n    private async void TaxSettings_Loaded(object? sender, RoutedEventArgs e)\n    {\n        try\n        {\n            await using var db = await _dbFactory.CreateDbContextAsync();\n            var settings = await db.TaxSettings.AsNoTracking().FirstOrDefaultAsync();\n            _taxEnabled = settings?.IsEnabled == true;\n            _taxRate = settings?.Rate ?? 0m;\n            _pricesIncludeTax = settings?.PricesIncludeTax == true;\n            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;\n            _taxSettingsLoaded = true;\n        }\n        catch\n        {\n            _taxEnabled = false;\n            _taxRate = 0m;\n            _pricesIncludeTax = false;\n            _showTaxOnInvoice = false;\n            _taxSettingsLoaded = true;\n        }\n\n        AttachTaxInteractionWatchers();\n        RefreshTaxAndTotals();\n    }\n\n    private void AttachTaxInteractionWatchers()\n    {\n        if (CartGrid is not null)\n            CartGrid.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals))), true);\n\n        if (InvoiceDiscountBox is not null)\n            InvoiceDiscountBox.LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals));\n    }\n\n    private void RefreshTaxAndTotals()\n    {\n        if (!_taxSettingsLoaded || _taxRefreshInProgress) return;\n\n        try\n        {\n            _taxRefreshInProgress = true;\n            foreach (var item in _cart) item.Tax = 0m;\n\n            var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);\n            var lineDiscount = _cart.Sum(x => x.Discount);\n            var taxableAmount = Math.Max(0m, subtotal - lineDiscount - Math.Max(0m, _invoiceDiscount));\n            _invoiceTax = _taxEnabled ? CalculateTax(taxableAmount) : 0m;\n\n            RefreshTotal();\n\n            var discount = lineDiscount + _invoiceDiscount;\n            var total = Math.Max(0m, subtotal - discount + _invoiceTax);\n            SubtotalText.Text = subtotal.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);\n            DiscountText.Text = discount.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);\n            ReceiptSubtotalText.Text = SubtotalText.Text;\n            ReceiptDiscountText.Text = DiscountText.Text;\n            ReceiptTaxText.Text = _showTaxOnInvoice ? _invoiceTax.ToString("N2", System.Globalization.CultureInfo.CurrentCulture) : "0.00";\n            ReceiptTotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);\n            TotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);\n            PaymentBox.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);\n            CartGrid.Items.Refresh();\n            ReceiptItemsPanel.Items.Refresh();\n        }\n        finally\n        {\n            _taxRefreshInProgress = false;\n        }\n    }\n\n    private decimal CalculateTax(decimal taxableAmount)\n    {\n        if (!_taxEnabled || _taxRate <= 0m || taxableAmount <= 0m) return 0m;\n        if (_pricesIncludeTax)\n            return Math.Round(taxableAmount - taxableAmount / (1m + _taxRate / 100m), 2, MidpointRounding.AwayFromZero);\n        return Math.Round(taxableAmount * (_taxRate / 100m), 2, MidpointRounding.AwayFromZero);\n    }\n\n    private static bool IsDescendantOf(DependencyObject? source, DependencyObject ancestor)\n    {\n        while (source is not null)\n        {\n            if (ReferenceEquals(source, ancestor)) return true;\n            source = VisualTreeHelper.GetParent(source);\n        }\n        return false;\n    }\n}\n'''
+          tax_path.write_text(tax_code, encoding='utf-8')
+
+          xaml_path = root / 'src/POS_WPF/PosWindow.xaml'
+          xaml = xaml_path.read_text(encoding='utf-8')
+          xaml = xaml.replace(
+              '<Setter Property="VerticalContentAlignment" Value="Stretch"/>\n        </Style>',
+              '<Setter Property="VerticalContentAlignment" Value="Stretch"/>\n            <Setter Property="HorizontalAlignment" Value="Left"/>\n            <Setter Property="VerticalAlignment" Value="Top"/>\n        </Style>',
+              1)
+          xaml = xaml.replace(
+              '<ItemsControl x:Name="PopularProductsPanel">',
+              '<ItemsControl x:Name="PopularProductsPanel" HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Left">',
+              1)
+          xaml = xaml.replace(
+              '<Button Style="{StaticResource ProductCardStyle}" Click="PopularProduct_Click">',
+              '<Button Style="{StaticResource ProductCardStyle}" HorizontalAlignment="Left" VerticalAlignment="Top" Click="PopularProduct_Click">',
+              1)
+          xaml = xaml.replace(
+              '<TextBlock Text="  / unit"',
+              '<TextBlock Text="  / {Binding UnitName, StringFormat=/ {0}}"',
+              1)
+          xaml_path.write_text(xaml, encoding='utf-8')
+
+          touch_path = root / 'src/POS_WPF/PosWindow.TouchUx.cs'
+          touch = touch_path.read_text(encoding='utf-8')
+          start = touch.index('    private async void CategoryTab_Click')
+          end = touch.index('    private void KeypadTarget_GotKeyboardFocus', start)
+          category_method = '''    private async void CategoryTab_Click(object sender, RoutedEventArgs e)\n    {\n        if (sender is not Button button) return;\n        var categoryId = button.Tag is Guid id ? id : (Guid?)null;\n        foreach (var child in CategoryTabsPanel.Children.OfType<Button>())\n        {\n            var active = ReferenceEquals(child, button);\n            child.Background = active ? new SolidColorBrush(Color.FromRgb(32, 166, 74)) : Brushes.White;\n            child.Foreground = active ? Brushes.White : new SolidColorBrush(Color.FromRgb(51, 65, 85));\n        }\n\n        try\n        {\n            await LoadProductsForCategoryAsync(categoryId);\n        }\n        catch (Exception ex)\n        {\n            Status(ex.InnerException?.Message ?? ex.Message, false);\n        }\n    }\n\n    private async Task LoadProductsForCategoryAsync(Guid? categoryId)\n    {\n        await using var db = await _dbFactory.CreateDbContextAsync();\n\n        var sold = await db.Set<SaleLine>()\n            .Where(l => db.Sales.Any(s => s.Id == EF.Property<Guid>(l, "SaleId") && s.Status == SaleStatus.Completed))\n            .Where(l => db.Products.Any(p => p.Id == l.ProductId && p.IsActive && (!categoryId.HasValue || p.CategoryId == categoryId.Value)))\n            .GroupBy(l => l.ProductId)\n            .Select(g => new { ProductId = g.Key, Sold = g.Sum(x => x.Quantity * x.ConversionFactor) })\n            .OrderByDescending(x => x.Sold)\n            .ThenBy(x => x.ProductId)\n            .Take(60)\n            .ToListAsync();\n\n        var ids = sold.Select(x => x.ProductId).ToList();\n        var products = await db.Products.AsNoTracking()\n            .Where(x => x.IsActive && (!categoryId.HasValue || x.CategoryId == categoryId.Value))\n            .Include(x => x.Units)\n            .ToListAsync();\n\n        var soldProducts = sold\n            .Join(products, x => x.ProductId, x => x.Id, (x, p) => new { p, x.Sold })\n            .Select(x => CreatePopularProduct(x.p, x.Sold))\n            .ToList();\n\n        var soldIds = soldProducts.Select(x => x.ProductId).ToHashSet();\n        var fallback = products\n            .Where(p => !soldIds.Contains(p.Id))\n            .OrderBy(p => p.Name)\n            .Select(p => CreatePopularProduct(p, 0m));\n\n        PopularProductsPanel.ItemsSource = soldProducts.Concat(fallback).Take(60).ToList();\n    }\n\n    private static PopularProduct CreatePopularProduct(Product product, decimal sold)\n    {\n        var unit = product.Units.SingleOrDefault(u => u.Id == product.BaseUnitId) ?? product.Units.SingleOrDefault(u => u.IsBaseUnit);\n        return new PopularProduct(product.Id, unit?.Id ?? Guid.Empty, product.Sku, product.Name, unit?.SellingPrice ?? 0m, sold, unit?.Abbreviation ?? unit?.Name ?? "PCS");\n    }\n\n'''
+          touch = touch[:start] + category_method + touch[end:]
+          touch = touch.replace('using POS_WPF.Domain.Products;\n', 'using POS_WPF.Domain.Products;\nusing POS_WPF.Domain.Sales;\n')
+          touch_path.write_text(touch, encoding='utf-8')
+
+          # Ensure the new product-card binding compiles by using the already-exposed UnitName value.
+          print('source patch complete')
+
+          subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+          subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          subprocess.run(['git', 'add', 'src/POS_WPF/PosWindow.xaml', 'src/POS_WPF/PosWindow.xaml.cs', 'src/POS_WPF/PosWindow.Tax.cs', 'src/POS_WPF/PosWindow.TouchUx.cs', 'src/POS_WPF/Domain/Settings/StoreSettings.cs', 'src/POS_WPF/Infrastructure/Bootstrap/ApplicationSeeder.cs', 'src/POS_WPF/Domain/Sales/SaleEntities.cs', 'src/POS_WPF/Domain/POS/SalePostingService.cs'], check=True)
+          result = subprocess.run(['git', 'diff', '--cached', '--quiet'])
+          if result.returncode == 0:
+              print('No source changes to commit.')
+          else:
+              subprocess.run(['git', 'commit', '-m', 'Fix POS aggregate tax and product grid behavior'], check=True)
+              subprocess.run(['git', 'push', 'origin', 'HEAD:ci-production'], check=True)
+
+      - name: Build verification
+        shell: pwsh
+        run: |
+          dotnet restore POS_WPF.sln
+          dotnet build POS_WPF.sln --configuration Release --no-restore
+          dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
