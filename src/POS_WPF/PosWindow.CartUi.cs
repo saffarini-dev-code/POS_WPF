@@ -20,7 +20,7 @@ public partial class PosWindow
         var root = new FrameworkElementFactory(typeof(Border));
         root.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(238, 241, 245)));
         root.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 1));
-        root.SetValue(Border.PaddingProperty, new Thickness(8, 7));
+        root.SetValue(Border.PaddingProperty, new Thickness(8, 7, 8, 7));
 
         var dock = new FrameworkElementFactory(typeof(DockPanel));
         dock.SetValue(DockPanel.LastChildFillProperty, true);
@@ -39,7 +39,7 @@ public partial class PosWindow
         total.SetValue(FrameworkElement.WidthProperty, 58d);
         total.SetValue(Control.FontSizeProperty, 11d);
         total.SetValue(Control.FontWeightProperty, FontWeights.Bold);
-        total.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0));
+        total.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 6, 0));
         total.SetValue(DockPanel.DockProperty, Dock.Right);
         dock.AppendChild(total);
 
@@ -73,7 +73,7 @@ public partial class PosWindow
         var discount = new FrameworkElementFactory(typeof(TextBox));
         discount.SetValue(FrameworkElement.WidthProperty, 52d);
         discount.SetValue(FrameworkElement.HeightProperty, 24d);
-        discount.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0));
+        discount.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0, 4, 0));
         discount.SetValue(Control.FontSizeProperty, 9d);
         discount.SetValue(TextBox.TextAlignmentProperty, TextAlignment.Right);
         discount.SetValue(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center);
