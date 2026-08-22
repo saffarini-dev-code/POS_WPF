@@ -133,8 +133,17 @@ public partial class SettingsWindow : Window
                 Directory.CreateDirectory(logoDirectory);
                 var extension = Path.GetExtension(_selectedLogoPath);
                 var target = Path.Combine(logoDirectory, "logo" + extension.ToLowerInvariant());
-                File.Copy(_selectedLogoPath, target, true);
-                persistedLogo = Path.GetRelativePath(AppContext.BaseDirectory, target);
+                var sourceFullPath = Path.GetFullPath(_selectedLogoPath);
+                var targetFullPath = Path.GetFullPath(target);
+
+                // If the selected logo is already the persisted target, copying it
+                // onto itself causes an IOException. Keep the existing file instead.
+                if (!string.Equals(sourceFullPath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(sourceFullPath, targetFullPath, true);
+                }
+
+                persistedLogo = Path.GetRelativePath(AppContext.BaseDirectory, targetFullPath);
             }
             else
             {
