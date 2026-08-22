@@ -5,10 +5,13 @@ namespace POS_WPF;
 
 public partial class PaymentConfirmationDialog : Window
 {
-    public PaymentConfirmationDialog(decimal amountDue, decimal cashReceived, string paymentMethod, Window owner)
+    private readonly Func<Task<bool>> _completeSaleAsync;
+
+    public PaymentConfirmationDialog(decimal amountDue, decimal cashReceived, string paymentMethod, Window owner, Func<Task<bool>> completeSaleAsync)
     {
         InitializeComponent();
         Owner = owner;
+        _completeSaleAsync = completeSaleAsync;
         TotalText.Text = amountDue.ToString("C2", CultureInfo.CurrentCulture);
         AmountDueText.Text = amountDue.ToString("C2", CultureInfo.CurrentCulture);
         CashReceivedText.Text = cashReceived.ToString("C2", CultureInfo.CurrentCulture);
@@ -22,9 +25,31 @@ public partial class PaymentConfirmationDialog : Window
         Close();
     }
 
-    private void CompleteSale_Click(object sender, RoutedEventArgs e)
+    private async void CompleteSale_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = true;
-        Close();
+        CompleteButton.IsEnabled = false;
+        CancelButton.IsEnabled = false;
+        try
+        {
+            var completed = await _completeSaleAsync();
+            if (completed)
+            {
+                DialogResult = true;
+                Close();
+                return;
+            }
+        }
+        catch
+        {
+            // The POS sale pipeline reports the actual error through its toast/log.
+        }
+        finally
+        {
+            if (IsVisible)
+            {
+                CompleteButton.IsEnabled = true;
+                CancelButton.IsEnabled = true;
+            }
+        }
     }
 }
