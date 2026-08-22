@@ -67,7 +67,8 @@ public partial class PosWindow
 
         if (keypad != null)
         {
-            // Critical: prevent the keypad from stretching to the full payment height.
+            // Do NOT stretch the keypad vertically. The payment panel has more
+            // height than the keypad needs, so the keypad stays compact at the top.
             keypad.Width = 170;
             keypad.Height = 250;
             keypad.MinHeight = 0;
@@ -76,8 +77,7 @@ public partial class PosWindow
             keypad.HorizontalAlignment = HorizontalAlignment.Stretch;
             keypad.Margin = new Thickness(0);
 
-            // The keypad consists of the 4x3 number matrix plus Hold/Recall below it.
-            // Give both rows fixed heights so the number rows stay close together.
+            // Four compact number rows + Hold/Recall below.
             if (keypad.RowDefinitions.Count >= 2)
             {
                 keypad.RowDefinitions[0].Height = new GridLength(210);
@@ -111,9 +111,7 @@ public partial class PosWindow
                 }
             }
 
-            // Keep Hold / Recall directly under the keypad with normal touch sizing.
-            foreach (var button in keypad.Children
-                         .OfType<Button>())
+            foreach (var button in keypad.Children.OfType<Button>())
             {
                 button.Height = 36;
                 button.MinHeight = 36;
@@ -134,6 +132,13 @@ public partial class PosWindow
             chargeButton.Height = 38;
             chargeButton.MinHeight = 38;
         }
+
+        // Cash is the first and default payment method. Schedule this after the
+        // instance Loaded handler so the existing payment initialization cannot
+        // switch it back to Card.
+        window.Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() => window.SelectPaymentMethod("Cash")));
     }
 
     private static T? FindDescendant<T>(DependencyObject root, string name) where T : FrameworkElement
