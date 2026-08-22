@@ -1,9 +1,6 @@
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Domain.Settings;
 
@@ -16,16 +13,15 @@ public partial class PosWindow
     private decimal _taxRate;
     private bool _pricesIncludeTax;
     private bool _taxRefreshInProgress;
-    private bool _taxRefreshScheduled;
 
     protected override void OnInitialized(EventArgs e)
     {
         base.OnInitialized(e);
 
+        // Tax settings are loaded once when the POS is actually displayed.
+        // Do not attach global TextChanged/Click handlers here: they fire for
+        // every control during startup and can cause re-entrant total refreshes.
         Loaded += TaxSettings_Loaded;
-        AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(Tax_ButtonClicked), true);
-        AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler(Tax_TextChanged), true);
-        AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(Tax_PreviewMouseDown), true);
         AttachTaxVisibilityWatcher();
     }
 
@@ -42,56 +38,24 @@ public partial class PosWindow
         }
         catch
         {
+            // POS must still open when tax configuration cannot be read.
             _taxEnabled = false;
             _taxRate = 0m;
             _pricesIncludeTax = false;
             _taxSettingsLoaded = true;
         }
 
-        await Dispatcher.InvokeAsync(RefreshTaxAndTotals, DispatcherPriority.Background);
-    }
-
-    private void Tax_ButtonClicked(object sender, RoutedEventArgs e)
-    {
-        if (!_taxSettingsLoaded) return;
-        ScheduleTaxRefresh();
-    }
-
-    private void Tax_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (!_taxSettingsLoaded || _taxRefreshInProgress) return;
-
-        // RefreshTotal updates PaymentBox.Text. Listening to that change and
-        // immediately calling RefreshTaxAndTotals again creates an endless
-        // refresh cycle during POS startup and can terminate the process with
-        // 0x800703E9 (StackOverflowException).
-        if (ReferenceEquals(e.OriginalSource, PaymentBox) || ReferenceEquals(sender, PaymentBox))
-            return;
-
-        ScheduleTaxRefresh();
-    }
-
-    private void ScheduleTaxRefresh()
-    {
-        if (_taxRefreshScheduled || _taxRefreshInProgress) return;
-
-        _taxRefreshScheduled = true;
-        Dispatcher.BeginInvoke(
-            DispatcherPriority.Background,
-            new Action(() =>
-            {
-                _taxRefreshScheduled = false;
-                RefreshTaxAndTotals();
-            }));
-    }
-
-    private void Tax_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (!_taxSettingsLoaded || e.ChangedButton != MouseButton.Left) return;
-        if (IsDescendantOf(e.OriginalSource as DependencyObject, ChargeButton))
+        try
         {
             RefreshTaxAndTotals();
         }
+        catch
+        {
+            // Never allow optional tax UI initialization to crash POS startup.
+        }
+
+        // Cash is the default payment method for a new POS sale.
+        SelectPaymentMethod("Cash");
     }
 
     private void RefreshTaxAndTotals()
