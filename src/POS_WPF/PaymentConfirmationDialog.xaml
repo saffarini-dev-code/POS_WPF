@@ -9,9 +9,9 @@
         Background="Transparent"
         AllowsTransparency="True">
     <Border Width="384"
-            Height="320"
+            Height="360"
             Background="White"
-            CornerRadius="8"
+            CornerRadius="10"
             BorderBrush="#E2E8F0"
             BorderThickness="1"
             Padding="24"
@@ -27,83 +27,27 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-
             <Grid Grid.Row="0">
                 <StackPanel>
-                    <TextBlock Text="PROCESSING PAYMENT"
-                               FontSize="11"
-                               Foreground="#94A3B8"
-                               FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TotalText"
-                               FontSize="20"
-                               Foreground="#172033"
-                               Margin="0,2,0,0"/>
+                    <TextBlock Text="PROCESSING PAYMENT" FontSize="11" Foreground="#94A3B8" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TotalText" FontSize="20" Foreground="#172033" Margin="0,2,0,0"/>
                 </StackPanel>
-                <Border x:Name="PaymentMethodBadge"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Background="#EAF7EE"
-                        CornerRadius="5"
-                        Padding="10,5">
-                    <TextBlock x:Name="PaymentMethodText"
-                               FontSize="10"
-                               Foreground="#16A34A"
-                               FontWeight="Bold"/>
+                <Border x:Name="PaymentMethodBadge" HorizontalAlignment="Right" VerticalAlignment="Top" Background="#EAF7EE" CornerRadius="5" Padding="10,5">
+                    <TextBlock x:Name="PaymentMethodText" FontSize="10" Foreground="#16A34A" FontWeight="Bold"/>
                 </Border>
             </Grid>
-
             <Border Grid.Row="2" Background="#E2E8F0" Margin="0,18,0,0"/>
-
-            <Grid Grid.Row="3" Margin="0,18,0,0">
-                <TextBlock Text="Amount due" FontSize="13" Foreground="#64748B"/>
-                <TextBlock x:Name="AmountDueText" HorizontalAlignment="Right" FontSize="15" Foreground="#172033" FontWeight="SemiBold"/>
-            </Grid>
-
+            <Grid Grid.Row="3" Margin="0,18,0,0"><TextBlock Text="Amount due" FontSize="13" Foreground="#64748B"/><TextBlock x:Name="AmountDueText" HorizontalAlignment="Right" FontSize="15" Foreground="#172033" FontWeight="SemiBold"/></Grid>
             <Border Grid.Row="4" Background="#E2E8F0" Margin="0,14,0,0"/>
-
-            <Grid Grid.Row="5" Margin="0,14,0,0">
-                <TextBlock Text="Cash received" FontSize="13" Foreground="#64748B"/>
-                <TextBlock x:Name="CashReceivedText" HorizontalAlignment="Right" FontSize="15" Foreground="#172033" FontWeight="SemiBold"/>
-            </Grid>
-
+            <Grid Grid.Row="5" Margin="0,14,0,0"><TextBlock Text="Cash received" FontSize="13" Foreground="#64748B"/><TextBlock x:Name="CashReceivedText" HorizontalAlignment="Right" FontSize="15" Foreground="#172033" FontWeight="SemiBold"/></Grid>
             <Border Grid.Row="6" Background="#E2E8F0" Margin="0,14,0,0"/>
-
             <Grid Grid.Row="7" Margin="0,20,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="52"/>
-                </Grid.RowDefinitions>
-                <Grid Grid.Row="0">
-                    <TextBlock Text="Change" FontSize="15" Foreground="#16A34A" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="ChangeText" HorizontalAlignment="Right" FontSize="20" Foreground="#16A34A" FontWeight="Bold"/>
-                </Grid>
-                <Grid Grid.Row="1" Margin="0,20,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"
-                            Content="Cancel"
-                            Height="42"
-                            Margin="0,0,4,0"
-                            Click="Cancel_Click"
-                            Background="White"
-                            Foreground="#64748B"
-                            BorderBrush="#E2E8F0"
-                            BorderThickness="1"
-                            FontSize="13"
-                            FontWeight="SemiBold"/>
-                    <Button Grid.Column="1"
-                            Content="Complete Sale"
-                            Height="42"
-                            Margin="4,0,0,0"
-                            Click="CompleteSale_Click"
-                            Background="#20A64A"
-                            Foreground="White"
-                            BorderBrush="#20A64A"
-                            BorderThickness="1"
-                            FontSize="13"
-                            FontWeight="Bold"/>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="52"/></Grid.RowDefinitions>
+                <Grid Grid.Row="0"><TextBlock Text="Change" FontSize="15" Foreground="#16A34A" FontWeight="SemiBold"/><TextBlock x:Name="ChangeText" HorizontalAlignment="Right" FontSize="20" Foreground="#16A34A" FontWeight="Bold"/></Grid>
+                <Grid Grid.Row="1" Margin="0,24,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="Cancel" Height="44" Margin="0,0,4,0" Click="Cancel_Click" Background="White" Foreground="#64748B" BorderBrush="#E2E8F0" BorderThickness="1" FontSize="13" FontWeight="SemiBold"/>
+                    <Button Grid.Column="1" Content="Complete Sale" Height="44" Margin="4,0,0,0" Click="CompleteSale_Click" Background="#20A64A" Foreground="White" BorderBrush="#20A64A" BorderThickness="1" FontSize="13" FontWeight="Bold"/>
                 </Grid>
             </Grid>
         </Grid>
