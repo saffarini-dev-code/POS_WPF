@@ -9,6 +9,7 @@
         Background="Transparent"
         AllowsTransparency="True">
     <Border Width="384"
+            Height="320"
             Background="White"
             CornerRadius="8"
             BorderBrush="#E2E8F0"
