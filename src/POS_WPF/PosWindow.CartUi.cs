@@ -8,6 +8,7 @@ namespace POS_WPF;
 
 public partial class PosWindow
 {
+    // POS cart controls and totals layout.
     private void InitializeCartUi()
     {
         ApplyCartItemTemplate();
