@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace POS_WPF;
 
@@ -9,6 +10,7 @@ public partial class PosWindow
 {
     private bool _paymentLayoutApplied;
     private bool _taxVisibilityHooked;
+    private bool _cashierResponsiveLayoutHooked;
 
     static PosWindow()
     {
@@ -21,65 +23,91 @@ public partial class PosWindow
     private static void OnPosWindowLoadedForLayout(object sender, RoutedEventArgs e)
     {
         if (sender is not PosWindow window) return;
-        window.ApplyPaymentLayout();
+        window.ApplyCashierReferenceLayout();
         window.HookTaxVisibility();
     }
 
-    private void ApplyPaymentLayout()
+    private void ApplyCashierReferenceLayout()
     {
         if (_paymentLayoutApplied) return;
         if (CardButton is null || CashButton is null || MobileButton is null || PaymentBox is null || ChangeText is null || StatusText is null) return;
 
+        _paymentLayoutApplied = true;
+
+        // Reference composition: 44px top bar, full-height cashier workspace, compact status bar.
+        if (Content is Grid root && root.RowDefinitions.Count >= 3)
+        {
+            root.RowDefinitions[0].Height = new GridLength(44);
+            root.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+            root.RowDefinitions[2].Height = new GridLength(28);
+        }
+
         var paymentGrid = FindAncestor<Grid>(CardButton, grid => Grid.GetRow(grid) == 3);
         if (paymentGrid is null) return;
 
-        _paymentLayoutApplied = true;
+        // The reference reserves about one quarter of the screen for the order/payment panel.
+        if (paymentGrid.Parent is Border { Parent: Grid rightPanelGrid })
+        {
+            if (rightPanelGrid.RowDefinitions.Count >= 4)
+            {
+                rightPanelGrid.RowDefinitions[0].Height = new GridLength(62);
+                rightPanelGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+                rightPanelGrid.RowDefinitions[2].Height = new GridLength(106);
+                rightPanelGrid.RowDefinitions[3].Height = new GridLength(170);
+            }
+        }
 
-        // Detach the controls we keep before removing their old StackPanel parent.
-        if (CardButton.Parent is Panel oldPanel)
-            oldPanel.Children.Clear();
+        var workspaceGrid = FindAncestor<Grid>(paymentGrid, grid => grid.ColumnDefinitions.Count == 2);
+        if (workspaceGrid is not null && workspaceGrid.ColumnDefinitions.Count == 2)
+        {
+            workspaceGrid.ColumnDefinitions[0].Width = new GridLength(3, GridUnitType.Star);
+            workspaceGrid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+        }
+
+        // Detach controls before rebuilding the payment area. This avoids WPF logical-parent errors.
+        DetachElement(CardButton);
+        DetachElement(CashButton);
+        DetachElement(MobileButton);
+        DetachElement(PaymentBox);
+        DetachElement(ChangeText);
+        DetachElement(StatusText);
 
         paymentGrid.Children.Clear();
         paymentGrid.RowDefinitions.Clear();
         paymentGrid.ColumnDefinitions.Clear();
-        paymentGrid.Margin = new Thickness(12, 10, 12, 10);
-
+        paymentGrid.Margin = new Thickness(0);
         paymentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        paymentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(188) });
 
-        var paymentBorder = new Border
-        {
-            Background = Brushes.White,
-            BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5),
-            Padding = new Thickness(10),
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        Grid.SetColumn(paymentBorder, 0);
-
-        var paymentContent = new Grid();
+        var paymentContent = new Grid { Margin = new Thickness(14, 8, 14, 8) };
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        paymentContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         var paymentTitle = new TextBlock
         {
             Text = "PAYMENT",
-            FontSize = 10,
+            FontSize = 9,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
-            Margin = new Thickness(0, 0, 0, 7)
+            Foreground = Brush("#94A3B8"),
+            Margin = new Thickness(0, 0, 0, 6)
         };
         Grid.SetRow(paymentTitle, 0);
         paymentContent.Children.Add(paymentTitle);
 
-        ConfigurePaymentButton(CardButton, "▣  Card", new Thickness(0, 0, 5, 0));
-        ConfigurePaymentButton(CashButton, "▤  Cash", new Thickness(0, 0, 5, 0));
-        ConfigurePaymentButton(MobileButton, "▥  Mobile", new Thickness(0));
-        var methods = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, 0, 8) };
+        ConfigurePaymentButton(CardButton, "▣ Card", new Thickness(0, 0, 4, 0));
+        ConfigurePaymentButton(CashButton, "▤ Cash", new Thickness(2, 0, 2, 0));
+        ConfigurePaymentButton(MobileButton, "▥ Mobile", new Thickness(4, 0, 0, 0));
+
+        var methods = new Grid();
+        methods.ColumnDefinitions.Add(new ColumnDefinition());
+        methods.ColumnDefinitions.Add(new ColumnDefinition());
+        methods.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(CardButton, 0);
+        Grid.SetColumn(CashButton, 1);
+        Grid.SetColumn(MobileButton, 2);
         methods.Children.Add(CardButton);
         methods.Children.Add(CashButton);
         methods.Children.Add(MobileButton);
@@ -90,102 +118,128 @@ public partial class PosWindow
         {
             Text = "AMOUNT RECEIVED",
             FontSize = 9,
-            Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
-            Margin = new Thickness(0, 0, 0, 3)
+            Foreground = Brush("#94A3B8"),
+            Margin = new Thickness(0, 7, 0, 3)
         };
         Grid.SetRow(amountLabel, 2);
         paymentContent.Children.Add(amountLabel);
 
-        var amountArea = new Grid();
-        amountArea.RowDefinitions.Add(new RowDefinition { Height = new GridLength(44) });
-        amountArea.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        amountArea.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        PaymentBox.Height = 44;
-        PaymentBox.FontSize = 20;
+        PaymentBox.Height = 38;
+        PaymentBox.FontSize = 18;
         PaymentBox.FontWeight = FontWeights.Bold;
         PaymentBox.HorizontalContentAlignment = HorizontalAlignment.Right;
         PaymentBox.VerticalContentAlignment = VerticalAlignment.Center;
-        Grid.SetRow(PaymentBox, 0);
-        amountArea.Children.Add(PaymentBox);
+        PaymentBox.Margin = new Thickness(0);
+        Grid.SetRow(PaymentBox, 3);
+        paymentContent.Children.Add(PaymentBox);
 
-        var changePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+        var changePanel = new Grid { Margin = new Thickness(0, 5, 0, 0) };
         var changeLabel = new TextBlock
         {
             Text = "Change",
-            FontSize = 10,
-            Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+            FontSize = 9,
+            Foreground = Brush("#94A3B8"),
             VerticalAlignment = VerticalAlignment.Center
         };
-        changePanel.Children.Add(changeLabel);
-        ChangeText.FontSize = 14;
+        ChangeText.FontSize = 13;
         ChangeText.FontWeight = FontWeights.Bold;
-        ChangeText.Foreground = new SolidColorBrush(Color.FromRgb(22, 163, 74));
-        ChangeText.Margin = new Thickness(8, 0, 0, 0);
+        ChangeText.Foreground = Brush("#16A34A");
+        ChangeText.HorizontalAlignment = HorizontalAlignment.Right;
+        ChangeText.VerticalAlignment = VerticalAlignment.Center;
+        changePanel.Children.Add(changeLabel);
         changePanel.Children.Add(ChangeText);
-        Grid.SetRow(changePanel, 1);
-        amountArea.Children.Add(changePanel);
+        Grid.SetRow(changePanel, 4);
+        paymentContent.Children.Add(changePanel);
 
-        var charge = CreateActionButton("▣  CHARGE", 44, new SolidColorBrush(Color.FromRgb(32, 166, 74)), Brushes.White);
+        var actions = new Grid { Margin = new Thickness(0, 7, 0, 0) };
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var charge = CreateActionButton("CHARGE", 40, Brush("#20A64A"), Brushes.White);
         charge.Click += Complete_Click;
-        charge.Margin = new Thickness(0, 10, 0, 0);
-        Grid.SetRow(charge, 2);
-        amountArea.Children.Add(charge);
+        charge.Margin = new Thickness(0, 0, 5, 0);
+        Grid.SetColumn(charge, 0);
+        Grid.SetColumnSpan(charge, 3);
+        actions.Children.Add(charge);
 
-        Grid.SetRow(amountArea, 3);
-        paymentContent.Children.Add(amountArea);
+        Grid.SetRow(actions, 5);
+        paymentContent.Children.Add(actions);
 
-        StatusText.FontSize = 10;
-        StatusText.Margin = new Thickness(0, 8, 0, 0);
-        Grid.SetRow(StatusText, 4);
+        StatusText.FontSize = 9;
+        StatusText.Margin = new Thickness(0, 4, 0, 0);
+        StatusText.HorizontalAlignment = HorizontalAlignment.Left;
+        Grid.SetRow(StatusText, 5);
         paymentContent.Children.Add(StatusText);
 
-        paymentBorder.Child = paymentContent;
-        paymentGrid.Children.Add(paymentBorder);
+        paymentGrid.Children.Add(paymentContent);
 
-        var right = new Grid();
-        right.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        right.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
-        Grid.SetColumn(right, 1);
-        paymentGrid.Children.Add(right);
-
-        var keypadBorder = new Border
+        // Hold / Recall stay at the bottom of the order panel, matching the reference.
+        if (paymentGrid.Parent is Border { Parent: Grid orderGrid })
         {
-            Background = new SolidColorBrush(Color.FromRgb(246, 248, 251)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(220, 226, 234)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5),
-            Padding = new Thickness(4)
-        };
-        Grid.SetRow(keypadBorder, 0);
+            var bottom = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(14, 0, 14, 6),
+                IsHitTestVisible = true
+            };
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        var keypad = new UniformGrid { Rows = 4, Columns = 3 };
-        foreach (var key in new[] { "7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0" })
-            keypad.Children.Add(CreateKeypadButton(key));
-        var backspace = CreateKeypadButton("⌫", null);
-        backspace.Click += KeypadBackspace_Click;
-        keypad.Children.Add(backspace);
-        keypadBorder.Child = keypad;
-        right.Children.Add(keypadBorder);
+            var hold = CreateActionButton("Hold", 34, Brushes.White, Brush("#64748B"));
+            hold.Margin = new Thickness(0, 0, 4, 0);
+            hold.Click += Hold_Click;
+            Grid.SetColumn(hold, 0);
+            bottom.Children.Add(hold);
 
-        var holdRecall = new Grid { Margin = new Thickness(0, 7, 0, 0) };
-        holdRecall.ColumnDefinitions.Add(new ColumnDefinition());
-        holdRecall.ColumnDefinitions.Add(new ColumnDefinition());
-        Grid.SetRow(holdRecall, 1);
+            var recall = CreateActionButton("Recall", 34, Brushes.White, Brush("#64748B"));
+            recall.Margin = new Thickness(4, 0, 0, 0);
+            recall.Click += Recall_Click;
+            Grid.SetColumn(recall, 1);
+            bottom.Children.Add(recall);
+        }
 
-        var hold = CreateActionButton("Hold", 42, Brushes.White, new SolidColorBrush(Color.FromRgb(215, 222, 232)));
-        hold.Margin = new Thickness(0, 0, 4, 0);
-        hold.Click += Hold_Click;
-        Grid.SetColumn(hold, 0);
-        holdRecall.Children.Add(hold);
+        HookResponsiveCashierSizing();
+    }
 
-        var recall = CreateActionButton("Recall", 42, Brushes.White, new SolidColorBrush(Color.FromRgb(215, 222, 232)));
-        recall.Margin = new Thickness(4, 0, 0, 0);
-        recall.Click += Recall_Click;
-        Grid.SetColumn(recall, 1);
-        holdRecall.Children.Add(recall);
+    private void HookResponsiveCashierSizing()
+    {
+        if (_cashierResponsiveLayoutHooked || PopularProductsPanel is null) return;
+        _cashierResponsiveLayoutHooked = true;
+        PopularProductsPanel.SizeChanged += (_, _) => ResizeProductCards();
+        CategoryTabsPanel.SizeChanged += (_, _) => ResizeCategoryTabs();
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            ResizeProductCards();
+            ResizeCategoryTabs();
+        }));
+    }
 
-        right.Children.Add(holdRecall);
+    private void ResizeProductCards()
+    {
+        if (PopularProductsPanel is null || PopularProductsPanel.ActualWidth <= 0) return;
+        var width = Math.Max(180, Math.Floor((PopularProductsPanel.ActualWidth - 40) / 5.0));
+        foreach (var button in FindVisualChildren<Button>(PopularProductsPanel))
+        {
+            if (button.ClickMode != ClickMode.Hover) continue;
+            button.Width = width;
+            button.Height = 86;
+            button.Margin = new Thickness(5);
+            button.Padding = new Thickness(12);
+        }
+    }
+
+    private void ResizeCategoryTabs()
+    {
+        if (CategoryTabsPanel is null) return;
+        foreach (var button in CategoryTabsPanel.Children.OfType<Button>())
+        {
+            button.Height = 28;
+            button.Margin = new Thickness(0, 0, 6, 0);
+            button.Padding = new Thickness(12, 0, 12, 0);
+            button.FontSize = 11;
+        }
     }
 
     private void HookTaxVisibility()
@@ -200,7 +254,7 @@ public partial class PosWindow
     {
         if (ReceiptTaxText is null) return;
         if (!decimal.TryParse(ReceiptTaxText.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var tax)) tax = 0m;
-        var visible = tax > 0m;
+        var visible = Math.Abs(tax) > 0.000001m;
         if (TaxText is not null) TaxText.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
         foreach (var textBlock in FindVisualChildren<TextBlock>(this))
@@ -208,18 +262,6 @@ public partial class PosWindow
             if (string.Equals(textBlock.Text?.Trim(), "Tax", StringComparison.OrdinalIgnoreCase))
                 textBlock.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
-    }
-
-    private Button CreateKeypadButton(string value)
-    {
-        var button = new Button
-        {
-            Content = value,
-            Tag = value,
-            Style = (Style)FindResource("TouchKeyStyle")
-        };
-        if (value is not null) button.Click += Keypad_Click;
-        return button;
     }
 
     private Button CreateActionButton(string text, double height, Brush background, Brush foreground)
@@ -230,10 +272,11 @@ public partial class PosWindow
             Height = height,
             Background = background,
             Foreground = foreground,
-            BorderBrush = background == Brushes.White ? new SolidColorBrush(Color.FromRgb(215, 222, 232)) : background,
+            BorderBrush = background == Brushes.White ? Brush("#D7DEE8") : background,
             Style = (Style)FindResource("BaseButton"),
             HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center
+            VerticalContentAlignment = VerticalAlignment.Center,
+            FontSize = 12
         };
     }
 
@@ -241,11 +284,30 @@ public partial class PosWindow
     {
         button.Content = content;
         button.Width = double.NaN;
-        button.Height = 42;
+        button.Height = 34;
         button.Margin = margin;
         button.HorizontalContentAlignment = HorizontalAlignment.Center;
         button.VerticalContentAlignment = VerticalAlignment.Center;
+        button.FontSize = 11;
     }
+
+    private static void DetachElement(FrameworkElement element)
+    {
+        switch (element.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(element);
+                break;
+            case ContentControl contentControl when ReferenceEquals(contentControl.Content, element):
+                contentControl.Content = null;
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, element):
+                decorator.Child = null;
+                break;
+        }
+    }
+
+    private static Brush Brush(string hex) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
 
     private static T? FindAncestor<T>(DependencyObject start, Func<T, bool>? predicate = null) where T : DependencyObject
     {
