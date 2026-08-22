@@ -31,8 +31,7 @@ public partial class ProductManagementWindow
     {
         var parent = OpeningStockBox.Parent as Grid;
         if (parent is null) return;
-        var row = new RowDefinition { Height = GridLength.Auto };
-        parent.RowDefinitions.Add(row);
+        parent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var label = new TextBlock { Text = "Reorder Level", Margin = new Thickness(0, 8, 10, 5) };
         var box = new TextBox { Text = "0", Margin = new Thickness(0, 6, 10, 12), ToolTip = "Base-unit quantity at or below which stock is considered low." };
         var stack = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
@@ -44,10 +43,7 @@ public partial class ProductManagementWindow
         _reorderLevelBox = box;
     }
 
-    private void NewProductReorderLevel()
-    {
-        if (_reorderLevelBox is not null) _reorderLevelBox.Text = "0";
-    }
+    private void NewProductReorderLevel(){if(_reorderLevelBox is not null)_reorderLevelBox.Text="0";}
 
     private async Task LoadSelectedReorderLevelAsync()
     {
@@ -65,7 +61,10 @@ public partial class ProductManagementWindow
 
     private static void OnProductManagementButtonClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not ProductManagementWindow window || e.OriginalSource is not Button button || !string.Equals(button.Content?.ToString(), "✓  Save Product", StringComparison.Ordinal)) return;
+        if (sender is not ProductManagementWindow window || e.OriginalSource is not Button button) return;
+        var caption = button.Content?.ToString() ?? string.Empty;
+        if (caption.StartsWith("＋  New Product", StringComparison.Ordinal)) { window.NewProductReorderLevel(); return; }
+        if (!string.Equals(caption, "✓  Save Product", StringComparison.Ordinal)) return;
         var sku = window.SkuBox.Text.Trim();
         var levelText = window._reorderLevelBox?.Text?.Trim() ?? "0";
         if (string.IsNullOrWhiteSpace(sku) || !decimal.TryParse(levelText, NumberStyles.Number, CultureInfo.CurrentCulture, out var level) || level < 0) return;
@@ -79,5 +78,6 @@ public partial class ProductManagementWindow
         if (product is null) return;
         product.ReorderLevel = level;
         await db.SaveChangesAsync();
+        NewProductReorderLevel();
     }
 }
