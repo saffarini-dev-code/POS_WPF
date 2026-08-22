@@ -7,9 +7,9 @@ using System.Windows.Media;
 namespace POS_WPF;
 
 /// <summary>
-/// Final responsive layout pass for the cashier screen.
-/// Keeps the cart/scan area compact and gives the touch payment keypad a dedicated,
-/// predictable area so it never overlaps the payment controls.
+/// Responsive layout pass for the cashier screen.
+/// Keeps the order area compact and gives the payment controls and keypad
+/// a balanced, predictable touch layout.
 /// </summary>
 public partial class PosWindow
 {
@@ -26,14 +26,12 @@ public partial class PosWindow
         if (sender is not PosWindow window || window.Content is not Grid root)
             return;
 
-        // Root: header / body / footer.
         if (root.RowDefinitions.Count < 3 || root.Children.Count == 0)
             return;
 
         if (root.Children.OfType<Grid>().FirstOrDefault(x => Grid.GetRow(x) == 1) is not Grid body)
             return;
 
-        // Body: product area / cashier area.
         var cashierBorder = body.Children
             .OfType<Border>()
             .FirstOrDefault(x => Grid.GetColumn(x) == 1);
@@ -41,26 +39,24 @@ public partial class PosWindow
         if (cashierBorder?.Child is not Grid cashierGrid || cashierGrid.RowDefinitions.Count < 4)
             return;
 
-        // Compact the order/scan area. The previous proportional layout made this
-        // region consume too much vertical space and left the payment controls cramped.
+        // Keep the order/scan region compact. Do not let it consume the payment area.
         cashierGrid.RowDefinitions[0].Height = new GridLength(58);
         cashierGrid.RowDefinitions[1].Height = new GridLength(270);
         cashierGrid.RowDefinitions[1].MinHeight = 220;
         cashierGrid.RowDefinitions[2].Height = new GridLength(115);
         cashierGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
-        cashierGrid.RowDefinitions[3].MinHeight = 320;
+        cashierGrid.RowDefinitions[3].MinHeight = 270;
 
         if (cashierGrid.Children
                 .OfType<Grid>()
                 .FirstOrDefault(x => Grid.GetRow(x) == 3) is not Grid paymentGrid)
             return;
 
-        // Keep the keypad compact and proportional to the payment controls.
-        // The previous 205px column with 52px buttons was visually oversized.
+        // Balanced payment split: keypad is intentionally compact, not full-height.
         if (paymentGrid.ColumnDefinitions.Count >= 2)
         {
             paymentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-            paymentGrid.ColumnDefinitions[1].Width = new GridLength(175);
+            paymentGrid.ColumnDefinitions[1].Width = new GridLength(170);
         }
 
         paymentGrid.Margin = new Thickness(8, 6, 8, 6);
@@ -71,9 +67,22 @@ public partial class PosWindow
 
         if (keypad != null)
         {
+            // Critical: prevent the keypad from stretching to the full payment height.
+            keypad.Width = 170;
+            keypad.Height = 250;
+            keypad.MinHeight = 0;
+            keypad.MaxHeight = 250;
+            keypad.VerticalAlignment = VerticalAlignment.Top;
+            keypad.HorizontalAlignment = HorizontalAlignment.Stretch;
             keypad.Margin = new Thickness(0);
+
+            // The keypad consists of the 4x3 number matrix plus Hold/Recall below it.
+            // Give both rows fixed heights so the number rows stay close together.
             if (keypad.RowDefinitions.Count >= 2)
-                keypad.RowDefinitions[1].Height = new GridLength(36);
+            {
+                keypad.RowDefinitions[0].Height = new GridLength(210);
+                keypad.RowDefinitions[1].Height = new GridLength(40);
+            }
 
             var keypadBorder = keypad.Children
                 .OfType<Border>()
@@ -81,22 +90,37 @@ public partial class PosWindow
 
             if (keypadBorder?.Child is UniformGrid uniformGrid)
             {
+                keypadBorder.Height = 210;
+                keypadBorder.MinHeight = 0;
+                keypadBorder.MaxHeight = 210;
                 keypadBorder.Padding = new Thickness(3);
+                uniformGrid.Height = 204;
+                uniformGrid.MinHeight = 0;
+                uniformGrid.MaxHeight = 204;
                 uniformGrid.Margin = new Thickness(0);
 
                 foreach (var button in uniformGrid.Children.OfType<Button>())
                 {
                     button.Height = 42;
                     button.MinHeight = 42;
+                    button.MaxHeight = 42;
                     button.Margin = new Thickness(2);
                     button.FontSize = 16;
                     button.Padding = new Thickness(1);
+                    button.VerticalAlignment = VerticalAlignment.Center;
                 }
+            }
+
+            // Keep Hold / Recall directly under the keypad with normal touch sizing.
+            foreach (var button in keypad.Children
+                         .OfType<Button>())
+            {
+                button.Height = 36;
+                button.MinHeight = 36;
+                button.MaxHeight = 36;
             }
         }
 
-        // Payment controls get consistent touch-friendly sizing without consuming
-        // the space needed by the keypad.
         foreach (var button in paymentGrid.Children
                      .OfType<StackPanel>()
                      .SelectMany(x => x.Children.OfType<Button>()))
@@ -104,7 +128,6 @@ public partial class PosWindow
             button.MinHeight = Math.Max(button.MinHeight, 34);
         }
 
-        // The charge action should remain a clear, full-width touch target.
         var chargeButton = FindDescendant<Button>(paymentGrid, "ChargeButton");
         if (chargeButton != null)
         {
