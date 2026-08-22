@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -18,9 +17,38 @@ public partial class PosWindow
 
     private static bool RegisterInventoryGuardHandlers()
     {
+        EventManager.RegisterClassHandler(typeof(PosWindow), FrameworkElement.InitializedEvent, new RoutedEventHandler(OnPosWindowInitializedForCartStyle));
         EventManager.RegisterClassHandler(typeof(PosWindow), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnInventoryGuardLoaded));
         EventManager.RegisterClassHandler(typeof(PosWindow), KeyDownEvent, new KeyEventHandler(OnPosBarcodeKeyDown), true);
         return true;
+    }
+
+    private static void OnPosWindowInitializedForCartStyle(object sender, RoutedEventArgs e)
+    {
+        if (sender is PosWindow window && window.CartGrid is not null)
+        {
+            var style = new Style(typeof(ListViewItem));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(Control.MarginProperty, new Thickness(0)));
+            var template = new ControlTemplate(typeof(ListViewItem));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            border.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            border.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            border.SetBinding(Border.PaddingProperty, new Binding(nameof(Control.Padding)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetBinding(ContentPresenter.ContentProperty, new Binding(nameof(ContentControl.Content)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            presenter.SetBinding(ContentPresenter.ContentTemplateProperty, new Binding(nameof(ContentControl.ContentTemplate)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            presenter.SetBinding(ContentPresenter.ContentStringFormatProperty, new Binding(nameof(ContentControl.ContentStringFormat)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            presenter.SetBinding(ContentPresenter.HorizontalAlignmentProperty, new Binding(nameof(Control.HorizontalContentAlignment)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            presenter.SetBinding(ContentPresenter.VerticalAlignmentProperty, new Binding(nameof(Control.VerticalContentAlignment)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            window.CartGrid.ItemContainerStyle = style;
+        }
     }
 
     private static void OnInventoryGuardLoaded(object sender, RoutedEventArgs e)
@@ -73,7 +101,6 @@ public partial class PosWindow
         root.SetValue(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(215, 222, 232)));
         root.SetValue(Control.BorderThicknessProperty, new Thickness(1));
         root.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(InventoryProductCard_Click));
-
         var borderTemplate = new ControlTemplate(typeof(Button));
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
@@ -87,12 +114,10 @@ public partial class PosWindow
         border.AppendChild(presenter);
         borderTemplate.VisualTree = border;
         root.SetValue(Control.TemplateProperty, borderTemplate);
-
         var content = new FrameworkElementFactory(typeof(StackPanel));
         content.SetValue(FrameworkElement.MarginProperty, new Thickness(12));
         content.AppendChild(BoundTextBlock(nameof(PopularProduct.SkuText), 8, new SolidColorBrush(Color.FromRgb(148, 163, 184))));
         content.AppendChild(BoundTextBlock(nameof(PopularProduct.Name), 12, new SolidColorBrush(Color.FromRgb(23, 32, 51)), FontWeights.SemiBold));
-
         var pricePanel = new FrameworkElementFactory(typeof(StackPanel));
         pricePanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
         pricePanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 4, 0, 0));
@@ -101,7 +126,6 @@ public partial class PosWindow
         unit.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 4, 0, 0));
         pricePanel.AppendChild(unit);
         content.AppendChild(pricePanel);
-
         var info = new FrameworkElementFactory(typeof(ProductCardStockInfo));
         info.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
         info.SetBinding(ProductCardStockInfo.ProductIdProperty, new Binding(nameof(PopularProduct.ProductId)));
@@ -139,11 +163,7 @@ public partial class PosWindow
             var existing = _cart.FirstOrDefault(x => x.ProductId == item.ProductId && x.UnitId == item.UnitId);
             var requested = (existing?.Quantity ?? 0m) + 1m;
             if (!await HasSufficientStockAsync(item.ProductId, item.UnitId, requested)) { Status("المخزون لا يكفي للإضافة.", false); return; }
-            if (existing is null)
-            {
-                existing = new CartItem(item.ProductId, item.UnitId, item.Name, item.UnitName, 1m, item.Price);
-                _cart.Add(existing);
-            }
+            if (existing is null) { existing = new CartItem(item.ProductId, item.UnitId, item.Name, item.UnitName, 1m, item.Price); _cart.Add(existing); }
             else existing.Quantity = requested;
             await ApplyPromotionAsync(existing);
             RefreshTotal();
@@ -171,11 +191,7 @@ public partial class PosWindow
             var existing = _cart.FirstOrDefault(x => x.ProductId == match.Product.Id && x.UnitId == match.Unit.Id);
             var requested = (existing?.Quantity ?? 0m) + 1m;
             if (!await HasSufficientStockAsync(match.Product.Id, match.Unit.Id, requested)) { Status("المخزون لا يكفي للإضافة.", false); return; }
-            if (existing is null)
-            {
-                existing = new CartItem(match.Product.Id, match.Unit.Id, match.Product.Name, match.Unit.Name, match.Unit.ConversionFactorToBase, match.Unit.SellingPrice);
-                _cart.Add(existing);
-            }
+            if (existing is null) { existing = new CartItem(match.Product.Id, match.Unit.Id, match.Product.Name, match.Unit.Name, match.Unit.ConversionFactorToBase, match.Unit.SellingPrice); _cart.Add(existing); }
             else existing.Quantity = requested;
             await ApplyPromotionAsync(existing);
             RefreshTotal();
@@ -212,41 +228,14 @@ public partial class PosWindow
         public Guid ProductId { get => (Guid)GetValue(ProductIdProperty); set => SetValue(ProductIdProperty, value); }
         private readonly TextBlock _text = new() { FontSize = 8, Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)) };
         private readonly Ellipse _indicator = new() { Width = 8, Height = 8, Margin = new Thickness(0, 0, 4, 0) };
-        public ProductCardStockInfo()
-        {
-            Orientation = Orientation.Horizontal;
-            Children.Add(_indicator);
-            Children.Add(_text);
-            Loaded += async (_, _) => await RefreshAsync();
-        }
-        private static void OnProductIdChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) { if (d is ProductCardStockInfo control && control.IsLoaded) _ = control.RefreshAsync(); }
-        private async Task RefreshAsync()
-        {
-            if (ProductId == Guid.Empty || FindParentWindow(this) is not PosWindow window) return;
-            var info = await window.GetProductCardInfoAsync(ProductId);
-            var state = info.Stock <= info.Reorder && info.Reorder > 0m ? "LOW" : info.Reorder > 0m && info.Stock <= info.Reorder * 2m ? "WATCH" : "IN STOCK";
-            _text.Text = $"Barcode: {(string.IsNullOrWhiteSpace(info.Barcode) ? "—" : info.Barcode)}   Stock: {info.Stock:N0} {info.Unit}   {state}";
-            _indicator.Fill = state == "LOW" ? Brushes.Red : state == "WATCH" ? Brushes.Gold : Brushes.Green;
-        }
-        private static Window? FindParentWindow(DependencyObject child)
-        {
-            var current = child;
-            while (current is not null)
-            {
-                if (current is Window window) return window;
-                current = LogicalTreeHelper.GetParent(current) ?? (current is Visual visual ? VisualTreeHelper.GetParent(visual) : null);
-            }
-            return null;
-        }
+        public ProductCardStockInfo(){ Orientation = Orientation.Horizontal; Children.Add(_indicator); Children.Add(_text); Loaded += async (_, _) => await RefreshAsync(); }
+        private static void OnProductIdChanged(DependencyObject d, DependencyPropertyChangedEventArgs e){if(d is ProductCardStockInfo control && control.IsLoaded)_=control.RefreshAsync();}
+        private async Task RefreshAsync(){if(ProductId==Guid.Empty||FindParentWindow(this) is not PosWindow window)return;var info=await window.GetProductCardInfoAsync(ProductId);var state=info.Stock<=info.Reorder&&info.Reorder>0m?"LOW":info.Reorder>0m&&info.Stock<=info.Reorder*2m?"WATCH":"IN STOCK";_text.Text=$"Barcode: {(string.IsNullOrWhiteSpace(info.Barcode)?"—":info.Barcode)}   Stock: {info.Stock:N0} {info.Unit}   {state}";_indicator.Fill=state=="LOW"?Brushes.Red:state=="WATCH"?Brushes.Gold:Brushes.Green;}
+        private static Window? FindParentWindow(DependencyObject child){var current=child;while(current is not null){if(current is Window window)return window;current=LogicalTreeHelper.GetParent(current)??(current is Visual visual?VisualTreeHelper.GetParent(visual):null);}return null;}
     }
 
     private static class DependencyPropertyDescriptorHelper
     {
-        public static void Attach(DependencyObject source, DependencyProperty property, Func<Task> callback)
-        {
-            var descriptor = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(property, source.GetType());
-            if (descriptor is null) return;
-            descriptor.AddValueChanged(source, (_, _) => _ = callback());
-        }
+        public static void Attach(DependencyObject source, DependencyProperty property, Func<Task> callback){var descriptor=System.ComponentModel.DependencyPropertyDescriptor.FromProperty(property,source.GetType());if(descriptor is null)return;descriptor.AddValueChanged(source,(_,_)=>_=callback());}
     }
 }
