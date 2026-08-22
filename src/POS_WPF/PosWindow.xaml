@@ -162,7 +162,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="PopularProductsPanel">
                             <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                <ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -180,7 +180,7 @@
                                                 <TextBlock Text="{Binding PriceText}" FontSize="15" Foreground="#16A34A" FontWeight="Bold"/>
                                                 <TextBlock Text="  / unit" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
                                                 <TextBlock Text="{Binding SoldText}" FontSize="8" Foreground="#94A3B8"
-                                                           HorizontalAlignment="Right" Margin="Auto,0,0,0"/>
+                                                           HorizontalAlignment="Right" Margin="8,0,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
