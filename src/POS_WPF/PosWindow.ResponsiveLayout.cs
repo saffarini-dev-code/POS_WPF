@@ -41,31 +41,30 @@ public partial class PosWindow
         if (cashierBorder?.Child is not Grid cashierGrid || cashierGrid.RowDefinitions.Count < 4)
             return;
 
-        // Keep the order/scan region deliberately compact. The remaining space is
-        // allocated to payment so the keypad and Hold/Recall remain comfortably visible.
+        // Compact the order/scan area. The previous proportional layout made this
+        // region consume too much vertical space and left the payment controls cramped.
         cashierGrid.RowDefinitions[0].Height = new GridLength(58);
-        cashierGrid.RowDefinitions[1].Height = new GridLength(1.2, GridUnitType.Star);
-        cashierGrid.RowDefinitions[1].MinHeight = 170;
-        cashierGrid.RowDefinitions[2].Height = new GridLength(125);
-        cashierGrid.RowDefinitions[3].Height = new GridLength(1.8, GridUnitType.Star);
-        cashierGrid.RowDefinitions[3].MinHeight = 300;
+        cashierGrid.RowDefinitions[1].Height = new GridLength(270);
+        cashierGrid.RowDefinitions[1].MinHeight = 220;
+        cashierGrid.RowDefinitions[2].Height = new GridLength(115);
+        cashierGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
+        cashierGrid.RowDefinitions[3].MinHeight = 320;
 
         if (cashierGrid.Children
                 .OfType<Grid>()
                 .FirstOrDefault(x => Grid.GetRow(x) == 3) is not Grid paymentGrid)
             return;
 
-        // Wider dedicated keypad column. This is intentionally independent from
-        // the payment-method column so touch targets do not compete for space.
+        // Keep the keypad compact and proportional to the payment controls.
+        // The previous 205px column with 52px buttons was visually oversized.
         if (paymentGrid.ColumnDefinitions.Count >= 2)
         {
             paymentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-            paymentGrid.ColumnDefinitions[1].Width = new GridLength(205);
+            paymentGrid.ColumnDefinitions[1].Width = new GridLength(175);
         }
 
-        paymentGrid.Margin = new Thickness(10, 8, 10, 8);
+        paymentGrid.Margin = new Thickness(8, 6, 8, 6);
 
-        // Make touch targets larger and consistent at the same time.
         var keypad = paymentGrid.Children
             .OfType<Grid>()
             .FirstOrDefault(x => Grid.GetColumn(x) == 1);
@@ -74,7 +73,7 @@ public partial class PosWindow
         {
             keypad.Margin = new Thickness(0);
             if (keypad.RowDefinitions.Count >= 2)
-                keypad.RowDefinitions[1].Height = new GridLength(40);
+                keypad.RowDefinitions[1].Height = new GridLength(36);
 
             var keypadBorder = keypad.Children
                 .OfType<Border>()
@@ -82,21 +81,22 @@ public partial class PosWindow
 
             if (keypadBorder?.Child is UniformGrid uniformGrid)
             {
-                keypadBorder.Padding = new Thickness(4);
+                keypadBorder.Padding = new Thickness(3);
                 uniformGrid.Margin = new Thickness(0);
 
                 foreach (var button in uniformGrid.Children.OfType<Button>())
                 {
-                    button.Height = 52;
-                    button.MinHeight = 52;
-                    button.Margin = new Thickness(3);
-                    button.FontSize = 20;
-                    button.Padding = new Thickness(2);
+                    button.Height = 42;
+                    button.MinHeight = 42;
+                    button.Margin = new Thickness(2);
+                    button.FontSize = 16;
+                    button.Padding = new Thickness(1);
                 }
             }
         }
 
-        // Payment controls get slightly more vertical breathing room on touch POS screens.
+        // Payment controls get consistent touch-friendly sizing without consuming
+        // the space needed by the keypad.
         foreach (var button in paymentGrid.Children
                      .OfType<StackPanel>()
                      .SelectMany(x => x.Children.OfType<Button>()))
