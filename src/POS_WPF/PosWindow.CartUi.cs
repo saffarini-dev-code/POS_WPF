@@ -1,9 +1,8 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Media;
 using System.Windows.Markup;
+using System.Windows.Media;
 
 namespace POS_WPF;
 
@@ -23,62 +22,35 @@ public partial class PosWindow
         root.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 1));
         root.SetValue(Border.PaddingProperty, new Thickness(8, 7));
 
-        var grid = new FrameworkElementFactory(typeof(Grid));
-        grid.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        grid.AppendChild(CreateColumn(0, new GridLength(1, GridUnitType.Star), 120));
-        grid.AppendChild(CreateColumn(1, new GridLength(58)));
-        grid.AppendChild(CreateColumn(2, new GridLength(96)));
-        grid.AppendChild(CreateColumn(3, new GridLength(58)));
-        grid.AppendChild(CreateColumn(4, new GridLength(34)));
+        var dock = new FrameworkElementFactory(typeof(DockPanel));
+        dock.SetValue(DockPanel.LastChildFillProperty, true);
+        dock.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
 
-        var productPanel = new FrameworkElementFactory(typeof(StackPanel));
-        productPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        productPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        productPanel.SetValue(FrameworkElement.MinWidthProperty, 0d);
-        Grid.SetColumn(productPanel, 0);
+        var delete = CreateCircleButton("🗑", Color.FromRgb(254, 242, 242), 14, new SolidColorBrush(Color.FromRgb(220, 38, 38)), new SolidColorBrush(Color.FromRgb(254, 202, 202)), 12);
+        delete.SetValue(FrameworkElement.ToolTipProperty, "Remove product");
+        delete.AddHandler(Button.ClickEvent, new RoutedEventHandler(CartDelete_Click));
+        delete.SetValue(DockPanel.DockProperty, Dock.Right);
+        dock.AppendChild(delete);
 
-        var product = new FrameworkElementFactory(typeof(TextBlock));
-        product.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.ProductName)));
-        product.SetValue(Control.FontSizeProperty, 11d);
-        product.SetValue(Control.FontWeightProperty, FontWeights.SemiBold);
-        product.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
-        product.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        productPanel.AppendChild(product);
-
-        var unit = new FrameworkElementFactory(typeof(TextBlock));
-        unit.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.UnitName)));
-        unit.SetValue(Control.FontSizeProperty, 8d);
-        unit.SetValue(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(148, 163, 184)));
-        unit.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 0, 0));
-        unit.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        productPanel.AppendChild(unit);
-        grid.AppendChild(productPanel);
-
-        var discount = new FrameworkElementFactory(typeof(TextBox));
-        discount.SetValue(FrameworkElement.WidthProperty, 52d);
-        discount.SetValue(FrameworkElement.HeightProperty, 24d);
-        discount.SetValue(FrameworkElement.MarginProperty, new Thickness(3, 0));
-        discount.SetValue(Control.FontSizeProperty, 9d);
-        discount.SetValue(TextBox.TextAlignmentProperty, TextAlignment.Right);
-        discount.SetValue(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center);
-        discount.SetValue(FrameworkElement.ToolTipProperty, "Discount");
-        discount.SetBinding(TextBox.TextProperty, new Binding(nameof(CartItem.ManualDiscount))
-        {
-            Mode = BindingMode.TwoWay,
-            UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
-            StringFormat = "N2"
-        });
-        discount.AddHandler(TextBox.LostFocusEvent, new RoutedEventHandler(CartDiscount_LostFocus));
-        Grid.SetColumn(discount, 1);
-        grid.AppendChild(discount);
+        var total = new FrameworkElementFactory(typeof(TextBlock));
+        total.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.LineTotal)) { StringFormat = "N2" });
+        total.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
+        total.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        total.SetValue(FrameworkElement.WidthProperty, 58d);
+        total.SetValue(Control.FontSizeProperty, 11d);
+        total.SetValue(Control.FontWeightProperty, FontWeights.Bold);
+        total.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0));
+        total.SetValue(DockPanel.DockProperty, Dock.Right);
+        dock.AppendChild(total);
 
         var quantityPanel = new FrameworkElementFactory(typeof(StackPanel));
         quantityPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
         quantityPanel.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         quantityPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        Grid.SetColumn(quantityPanel, 2);
+        quantityPanel.SetValue(FrameworkElement.WidthProperty, 96d);
+        quantityPanel.SetValue(DockPanel.DockProperty, Dock.Right);
 
-        var decrease = CreateCircleButton("−", Color.FromRgb(220, 38, 38), 14);
+        var decrease = CreateCircleButton("−", Color.FromRgb(220, 38, 38), 14, Brushes.White, null, 14);
         decrease.SetValue(FrameworkElement.ToolTipProperty, "Decrease quantity");
         decrease.AddHandler(Button.ClickEvent, new RoutedEventHandler(CartDecrease_Click));
         quantityPanel.AppendChild(decrease);
@@ -92,48 +64,57 @@ public partial class PosWindow
         quantity.SetValue(Control.FontWeightProperty, FontWeights.SemiBold);
         quantityPanel.AppendChild(quantity);
 
-        var increase = CreateCircleButton("+", Color.FromRgb(22, 163, 74), 14);
+        var increase = CreateCircleButton("+", Color.FromRgb(22, 163, 74), 14, Brushes.White, null, 14);
         increase.SetValue(FrameworkElement.ToolTipProperty, "Increase quantity");
         increase.AddHandler(Button.ClickEvent, new RoutedEventHandler(CartIncrease_Click));
         quantityPanel.AppendChild(increase);
-        grid.AppendChild(quantityPanel);
+        dock.AppendChild(quantityPanel);
 
-        var total = new FrameworkElementFactory(typeof(TextBlock));
-        total.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.LineTotal)) { StringFormat = "N2" });
-        total.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
-        total.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        total.SetValue(Control.FontSizeProperty, 11d);
-        total.SetValue(Control.FontWeightProperty, FontWeights.Bold);
-        total.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 0));
-        Grid.SetColumn(total, 3);
-        grid.AppendChild(total);
+        var discount = new FrameworkElementFactory(typeof(TextBox));
+        discount.SetValue(FrameworkElement.WidthProperty, 52d);
+        discount.SetValue(FrameworkElement.HeightProperty, 24d);
+        discount.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0));
+        discount.SetValue(Control.FontSizeProperty, 9d);
+        discount.SetValue(TextBox.TextAlignmentProperty, TextAlignment.Right);
+        discount.SetValue(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center);
+        discount.SetValue(FrameworkElement.ToolTipProperty, "Discount");
+        discount.SetBinding(TextBox.TextProperty, new Binding(nameof(CartItem.ManualDiscount))
+        {
+            Mode = BindingMode.TwoWay,
+            UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
+            StringFormat = "N2"
+        });
+        discount.AddHandler(TextBox.LostFocusEvent, new RoutedEventHandler(CartDiscount_LostFocus));
+        discount.SetValue(DockPanel.DockProperty, Dock.Right);
+        dock.AppendChild(discount);
 
-        var delete = CreateCircleButton("🗑", Color.FromRgb(220, 38, 38), 14);
-        delete.SetValue(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(220, 38, 38)));
-        delete.SetValue(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(254, 242, 242)));
-        delete.SetValue(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(254, 202, 202)));
-        delete.SetValue(Control.BorderThicknessProperty, new Thickness(1));
-        delete.SetValue(Control.FontSizeProperty, 12d);
-        delete.SetValue(FrameworkElement.ToolTipProperty, "Remove product");
-        delete.AddHandler(Button.ClickEvent, new RoutedEventHandler(CartDelete_Click));
-        Grid.SetColumn(delete, 4);
-        grid.AppendChild(delete);
+        var productPanel = new FrameworkElementFactory(typeof(StackPanel));
+        productPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        productPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
 
-        root.AppendChild(grid);
+        var product = new FrameworkElementFactory(typeof(TextBlock));
+        product.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.ProductName)));
+        product.SetValue(Control.FontSizeProperty, 11d);
+        product.SetValue(Control.FontWeightProperty, FontWeights.SemiBold);
+        product.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        productPanel.AppendChild(product);
+
+        var unit = new FrameworkElementFactory(typeof(TextBlock));
+        unit.SetBinding(TextBlock.TextProperty, new Binding(nameof(CartItem.UnitName)));
+        unit.SetValue(Control.FontSizeProperty, 8d);
+        unit.SetValue(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(148, 163, 184)));
+        unit.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 0, 0));
+        unit.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        productPanel.AppendChild(unit);
+
+        dock.AppendChild(productPanel);
+        root.AppendChild(dock);
         template.VisualTree = root;
         template.Seal();
         CartGrid.ItemTemplate = template;
     }
 
-    private static FrameworkElementFactory CreateColumn(int index, GridLength width, double? minWidth = null)
-    {
-        var definition = new FrameworkElementFactory(typeof(ColumnDefinition));
-        definition.SetValue(ColumnDefinition.WidthProperty, width);
-        if (minWidth.HasValue) definition.SetValue(ColumnDefinition.MinWidthProperty, minWidth.Value);
-        return definition;
-    }
-
-    private static FrameworkElementFactory CreateCircleButton(string content, Color background, double radius)
+    private static FrameworkElementFactory CreateCircleButton(string content, Color background, double radius, Brush foreground, Brush? borderBrush, double fontSize)
     {
         var button = new FrameworkElementFactory(typeof(Button));
         button.SetValue(Button.ContentProperty, content);
@@ -142,14 +123,14 @@ public partial class PosWindow
         button.SetValue(Control.MinWidthProperty, 28d);
         button.SetValue(Control.MinHeightProperty, 28d);
         button.SetValue(Control.PaddingProperty, new Thickness(0));
-        button.SetValue(Control.FontSizeProperty, 14d);
+        button.SetValue(Control.FontSizeProperty, fontSize);
         button.SetValue(Control.FontWeightProperty, FontWeights.Bold);
-        button.SetValue(Control.ForegroundProperty, Brushes.White);
+        button.SetValue(Control.ForegroundProperty, foreground);
         button.SetValue(Control.BackgroundProperty, new SolidColorBrush(background));
-        button.SetValue(Control.BorderThicknessProperty, new Thickness(0));
+        button.SetValue(Control.BorderBrushProperty, borderBrush ?? Brushes.Transparent);
+        button.SetValue(Control.BorderThicknessProperty, borderBrush is null ? new Thickness(0) : new Thickness(1));
         button.SetValue(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center);
         button.SetValue(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center);
-        button.SetValue(FrameworkElement.MarginProperty, new Thickness(0));
 
         var template = new ControlTemplate(typeof(Button));
         var border = new FrameworkElementFactory(typeof(Border));
@@ -161,7 +142,6 @@ public partial class PosWindow
         presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
         presenter.SetValue(ContentPresenter.ContentProperty, new TemplateBindingExtension(ContentControl.ContentProperty));
-        presenter.SetValue(ContentPresenter.ContentTemplateProperty, new TemplateBindingExtension(ContentControl.ContentTemplateProperty));
         border.AppendChild(presenter);
         template.VisualTree = border;
         button.SetValue(Control.TemplateProperty, template);
@@ -224,7 +204,6 @@ public partial class PosWindow
         var message = forceDelete
             ? $"سيتم حذف المنتج «{productName}» من السلة مهما كانت الكمية. هل تريد المتابعة؟"
             : $"كمية المنتج «{productName}» وصلت إلى 1. إذا تابعت سيتم حذف المنتج من السلة. هل تريد المتابعة؟";
-
         var text = new TextBlock
         {
             Text = message,
@@ -242,7 +221,6 @@ public partial class PosWindow
             HorizontalAlignment = HorizontalAlignment.Left,
             FlowDirection = FlowDirection.RightToLeft
         };
-
         var ok = new Button
         {
             Content = "موافق",
@@ -265,7 +243,6 @@ public partial class PosWindow
             BorderThickness = new Thickness(1),
             FontWeight = FontWeights.SemiBold
         };
-
         var confirmed = false;
         ok.Click += (_, _) => { confirmed = true; dialog.Close(); };
         cancel.Click += (_, _) => dialog.Close();
