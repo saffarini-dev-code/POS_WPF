@@ -34,7 +34,6 @@ public partial class PosWindow
 
         _paymentLayoutApplied = true;
 
-        // Reference composition: 44px top bar, full-height cashier workspace, compact status bar.
         if (Content is Grid root && root.RowDefinitions.Count >= 3)
         {
             root.RowDefinitions[0].Height = new GridLength(44);
@@ -45,7 +44,6 @@ public partial class PosWindow
         var paymentGrid = FindAncestor<Grid>(CardButton, grid => Grid.GetRow(grid) == 3);
         if (paymentGrid is null) return;
 
-        // The reference reserves about one quarter of the screen for the order/payment panel.
         if (paymentGrid.Parent is Border { Parent: Grid rightPanelGrid })
         {
             if (rightPanelGrid.RowDefinitions.Count >= 4)
@@ -53,7 +51,7 @@ public partial class PosWindow
                 rightPanelGrid.RowDefinitions[0].Height = new GridLength(62);
                 rightPanelGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
                 rightPanelGrid.RowDefinitions[2].Height = new GridLength(106);
-                rightPanelGrid.RowDefinitions[3].Height = new GridLength(170);
+                rightPanelGrid.RowDefinitions[3].Height = new GridLength(178);
             }
         }
 
@@ -64,7 +62,6 @@ public partial class PosWindow
             workspaceGrid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
         }
 
-        // Detach controls before rebuilding the payment area. This avoids WPF logical-parent errors.
         DetachElement(CardButton);
         DetachElement(CashButton);
         DetachElement(MobileButton);
@@ -78,7 +75,8 @@ public partial class PosWindow
         paymentGrid.Margin = new Thickness(0);
         paymentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        var paymentContent = new Grid { Margin = new Thickness(14, 8, 14, 8) };
+        var paymentContent = new Grid { Margin = new Thickness(14, 7, 14, 5) };
+        paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         paymentContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -88,11 +86,11 @@ public partial class PosWindow
 
         var paymentTitle = new TextBlock
         {
-            Text = "PAYMENT",
+            Text = "PAYMENT METHOD",
             FontSize = 9,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brush("#94A3B8"),
-            Margin = new Thickness(0, 0, 0, 6)
+            Margin = new Thickness(0, 0, 0, 5)
         };
         Grid.SetRow(paymentTitle, 0);
         paymentContent.Children.Add(paymentTitle);
@@ -119,12 +117,12 @@ public partial class PosWindow
             Text = "AMOUNT RECEIVED",
             FontSize = 9,
             Foreground = Brush("#94A3B8"),
-            Margin = new Thickness(0, 7, 0, 3)
+            Margin = new Thickness(0, 5, 0, 3)
         };
         Grid.SetRow(amountLabel, 2);
         paymentContent.Children.Add(amountLabel);
 
-        PaymentBox.Height = 38;
+        PaymentBox.Height = 36;
         PaymentBox.FontSize = 18;
         PaymentBox.FontWeight = FontWeights.Bold;
         PaymentBox.HorizontalContentAlignment = HorizontalAlignment.Right;
@@ -133,7 +131,7 @@ public partial class PosWindow
         Grid.SetRow(PaymentBox, 3);
         paymentContent.Children.Add(PaymentBox);
 
-        var changePanel = new Grid { Margin = new Thickness(0, 5, 0, 0) };
+        var changePanel = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         var changeLabel = new TextBlock
         {
             Text = "Change",
@@ -151,54 +149,39 @@ public partial class PosWindow
         Grid.SetRow(changePanel, 4);
         paymentContent.Children.Add(changePanel);
 
-        var actions = new Grid { Margin = new Thickness(0, 7, 0, 0) };
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var charge = CreateActionButton("CHARGE", 40, Brush("#20A64A"), Brushes.White);
+        var charge = CreateActionButton("CHARGE", 38, Brush("#20A64A"), Brushes.White);
         charge.Click += Complete_Click;
-        charge.Margin = new Thickness(0, 0, 5, 0);
-        Grid.SetColumn(charge, 0);
-        Grid.SetColumnSpan(charge, 3);
-        actions.Children.Add(charge);
+        charge.Margin = new Thickness(0, 5, 0, 0);
+        Grid.SetRow(charge, 5);
+        paymentContent.Children.Add(charge);
 
-        Grid.SetRow(actions, 5);
-        paymentContent.Children.Add(actions);
+        var holdRecall = new Grid { Margin = new Thickness(0, 5, 0, 0) };
+        holdRecall.ColumnDefinitions.Add(new ColumnDefinition());
+        holdRecall.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var hold = CreateActionButton("Hold", 32, Brushes.White, Brush("#64748B"));
+        hold.Margin = new Thickness(0, 0, 4, 0);
+        hold.Click += Hold_Click;
+        Grid.SetColumn(hold, 0);
+        holdRecall.Children.Add(hold);
+
+        var recall = CreateActionButton("Recall", 32, Brushes.White, Brush("#64748B"));
+        recall.Margin = new Thickness(4, 0, 0, 0);
+        recall.Click += Recall_Click;
+        Grid.SetColumn(recall, 1);
+        holdRecall.Children.Add(recall);
+
+        Grid.SetRow(holdRecall, 6);
+        paymentContent.Children.Add(holdRecall);
 
         StatusText.FontSize = 9;
-        StatusText.Margin = new Thickness(0, 4, 0, 0);
+        StatusText.Margin = new Thickness(0, 2, 0, 0);
         StatusText.HorizontalAlignment = HorizontalAlignment.Left;
-        Grid.SetRow(StatusText, 5);
+        Grid.SetRow(StatusText, 6);
+        StatusText.Visibility = Visibility.Collapsed;
         paymentContent.Children.Add(StatusText);
 
         paymentGrid.Children.Add(paymentContent);
-
-        // Hold / Recall stay at the bottom of the order panel, matching the reference.
-        if (paymentGrid.Parent is Border { Parent: Grid orderGrid })
-        {
-            var bottom = new Grid
-            {
-                VerticalAlignment = VerticalAlignment.Bottom,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(14, 0, 14, 6),
-                IsHitTestVisible = true
-            };
-            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var hold = CreateActionButton("Hold", 34, Brushes.White, Brush("#64748B"));
-            hold.Margin = new Thickness(0, 0, 4, 0);
-            hold.Click += Hold_Click;
-            Grid.SetColumn(hold, 0);
-            bottom.Children.Add(hold);
-
-            var recall = CreateActionButton("Recall", 34, Brushes.White, Brush("#64748B"));
-            recall.Margin = new Thickness(4, 0, 0, 0);
-            recall.Click += Recall_Click;
-            Grid.SetColumn(recall, 1);
-            bottom.Children.Add(recall);
-        }
 
         HookResponsiveCashierSizing();
     }
