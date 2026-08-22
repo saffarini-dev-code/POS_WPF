@@ -17,7 +17,7 @@ public partial class PosWindow
 
     private static bool RegisterInventoryGuardHandlers()
     {
-        EventManager.RegisterClassHandler(typeof(PosWindow), FrameworkElement.InitializedEvent, new RoutedEventHandler(OnPosWindowInitializedForCartStyle));
+        EventManager.RegisterClassHandler(typeof(PosWindow), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnPosWindowInitializedForCartStyle), true);
         EventManager.RegisterClassHandler(typeof(PosWindow), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnInventoryGuardLoaded));
         EventManager.RegisterClassHandler(typeof(PosWindow), KeyDownEvent, new KeyEventHandler(OnPosBarcodeKeyDown), true);
         return true;
