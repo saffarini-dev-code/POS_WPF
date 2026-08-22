@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <Compile Remove="PosWindow.PaymentLayout.cs" />
+  </ItemGroup>
+</Project>
