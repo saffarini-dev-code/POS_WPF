@@ -352,7 +352,14 @@ public partial class PosWindow : Window
         finally { BarcodeBox.Focus(); }
     }
 
-    private string BuildReceipt(string number, decimal total, decimal change) => $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";
+    private string BuildReceipt(string number, decimal total, decimal change)
+    {
+        var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
+        var discount = _cart.Sum(x => x.Discount) + _invoiceDiscount;
+        var tax = _cart.Sum(x => x.Tax);
+        var taxLine = tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;
+        return $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}SUBTOTAL: {subtotal:N2}{Environment.NewLine}DISCOUNT: {discount:N2}{Environment.NewLine}{taxLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";
+    }
 
     private void RefreshTotal()
     {
