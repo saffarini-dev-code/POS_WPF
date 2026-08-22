@@ -8,9 +8,11 @@ using System.Windows.Threading;
 namespace POS_WPF;
 
 /// <summary>
-/// Responsive layout pass for the cashier screen.
-/// Keeps the order area compact and gives the payment controls and keypad
-/// a balanced, predictable touch layout.
+/// Applies the cashier layout after WPF has completed the initial measure/arrange pass.
+/// The previous implementation changed Grid/UniformGrid dimensions directly from a
+/// Loaded class handler. That can mutate the visual tree while WPF is measuring it and
+/// can produce TextFormatter paragraphWidth = NaN, which is the startup crash recorded
+/// in the POS log.
 /// </summary>
 public partial class PosWindow
 {
@@ -24,137 +26,162 @@ public partial class PosWindow
 
     private static void OnPosWindowLoadedForResponsiveLayout(object sender, RoutedEventArgs e)
     {
-        if (sender is not PosWindow window || window.Content is not Grid root)
+        if (sender is not PosWindow window)
             return;
 
-        if (root.RowDefinitions.Count < 3 || root.Children.Count == 0)
-            return;
+        // Never mutate the layout tree while Loaded is being raised. Let WPF finish
+        // the current Loaded/measure/arrange cycle first.
+        window.Dispatcher.BeginInvoke(
+            DispatcherPriority.ContextIdle,
+            new Action(window.ApplyResponsiveLayoutSafely));
+    }
 
-        if (root.Children.OfType<Grid>().FirstOrDefault(x => Grid.GetRow(x) == 1) is not Grid body)
-            return;
+    private void ApplyResponsiveLayoutSafely()
+    {
+        try
+        {
+            if (!IsLoaded || Content is not Grid root)
+                return;
 
-        var cashierBorder = body.Children
-            .OfType<Border>()
-            .FirstOrDefault(x => Grid.GetColumn(x) == 1);
+            if (root.RowDefinitions.Count < 3)
+                return;
 
-        if (cashierBorder?.Child is not Grid cashierGrid || cashierGrid.RowDefinitions.Count < 4)
-            return;
-
-        // The scan/cart area gets all remaining vertical space. Payment is a
-        // compact fixed-height block at the bottom, eliminating the large
-        // unused area below the keypad.
-        cashierGrid.RowDefinitions[0].Height = new GridLength(58);
-        cashierGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
-        cashierGrid.RowDefinitions[1].MinHeight = 0;
-        cashierGrid.RowDefinitions[2].Height = new GridLength(115);
-        cashierGrid.RowDefinitions[3].Height = new GridLength(270);
-        cashierGrid.RowDefinitions[3].MinHeight = 270;
-        cashierGrid.RowDefinitions[3].MaxHeight = 270;
-
-        if (cashierGrid.Children
+            var body = root.Children
                 .OfType<Grid>()
-                .FirstOrDefault(x => Grid.GetRow(x) == 3) is not Grid paymentGrid)
-            return;
+                .FirstOrDefault(x => Grid.GetRow(x) == 1);
 
-        // Keep the payment controls comfortable while reserving a dedicated,
-        // compact keypad column.
-        if (paymentGrid.ColumnDefinitions.Count >= 2)
-        {
-            paymentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-            paymentGrid.ColumnDefinitions[1].Width = new GridLength(170);
-        }
+            if (body is null)
+                return;
 
-        paymentGrid.Margin = new Thickness(8, 6, 8, 6);
+            var cashierBorder = body.Children
+                .OfType<Border>()
+                .FirstOrDefault(x => Grid.GetColumn(x) == 1);
 
-        // Put payment methods in the requested order: Cash, Card, Mobile.
-        // The XAML keeps the named controls for existing event handlers, so
-        // swapping Grid columns here avoids changing payment behavior.
-        var cardButton = FindDescendant<Button>(paymentGrid, "CardButton");
-        var cashButton = FindDescendant<Button>(paymentGrid, "CashButton");
-        var mobileButton = FindDescendant<Button>(paymentGrid, "MobileButton");
-        if (cashButton != null && cardButton != null && mobileButton != null)
-        {
-            Grid.SetColumn(cashButton, 0);
-            Grid.SetColumn(cardButton, 1);
-            Grid.SetColumn(mobileButton, 2);
-        }
+            if (cashierBorder?.Child is not Grid cashierGrid || cashierGrid.RowDefinitions.Count < 4)
+                return;
 
-        var keypad = paymentGrid.Children
-            .OfType<Grid>()
-            .FirstOrDefault(x => Grid.GetColumn(x) == 1);
+            // Keep the scan/cart region flexible and the payment area compact.
+            cashierGrid.RowDefinitions[0].Height = new GridLength(58);
+            cashierGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+            cashierGrid.RowDefinitions[1].MinHeight = 0;
+            cashierGrid.RowDefinitions[2].Height = new GridLength(115);
+            cashierGrid.RowDefinitions[3].Height = new GridLength(270);
+            cashierGrid.RowDefinitions[3].MinHeight = 270;
+            cashierGrid.RowDefinitions[3].MaxHeight = 270;
 
-        if (keypad != null)
-        {
-            // Compact keypad: four rows of keys plus Hold/Recall. It must not
-            // stretch with the payment row, otherwise the rows become separated.
-            keypad.Width = 170;
-            keypad.Height = 250;
-            keypad.MinHeight = 0;
-            keypad.MaxHeight = 250;
-            keypad.VerticalAlignment = VerticalAlignment.Top;
-            keypad.HorizontalAlignment = HorizontalAlignment.Stretch;
-            keypad.Margin = new Thickness(0);
+            var paymentGrid = cashierGrid.Children
+                .OfType<Grid>()
+                .FirstOrDefault(x => Grid.GetRow(x) == 3);
 
-            if (keypad.RowDefinitions.Count >= 2)
+            if (paymentGrid is null)
+                return;
+
+            if (paymentGrid.ColumnDefinitions.Count >= 2)
             {
-                keypad.RowDefinitions[0].Height = new GridLength(210);
-                keypad.RowDefinitions[1].Height = new GridLength(40);
+                paymentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+                paymentGrid.ColumnDefinitions[1].Width = new GridLength(160);
             }
 
-            var keypadBorder = keypad.Children
-                .OfType<Border>()
-                .FirstOrDefault(x => Grid.GetRow(x) == 0);
+            paymentGrid.Margin = new Thickness(8, 6, 8, 6);
 
-            if (keypadBorder?.Child is UniformGrid uniformGrid)
+            // Payment order: Cash, Card, Mobile.
+            var cardButton = FindDescendant<Button>(paymentGrid, "CardButton");
+            var cashButton = FindDescendant<Button>(paymentGrid, "CashButton");
+            var mobileButton = FindDescendant<Button>(paymentGrid, "MobileButton");
+            if (cashButton != null && cardButton != null && mobileButton != null)
             {
-                keypadBorder.Height = 210;
-                keypadBorder.MinHeight = 0;
-                keypadBorder.MaxHeight = 210;
-                keypadBorder.Padding = new Thickness(3);
-                uniformGrid.Height = 204;
-                uniformGrid.MinHeight = 0;
-                uniformGrid.MaxHeight = 204;
-                uniformGrid.Margin = new Thickness(0);
+                Grid.SetColumn(cashButton, 0);
+                Grid.SetColumn(cardButton, 1);
+                Grid.SetColumn(mobileButton, 2);
+            }
 
-                foreach (var button in uniformGrid.Children.OfType<Button>())
+            var keypad = paymentGrid.Children
+                .OfType<Grid>()
+                .FirstOrDefault(x => Grid.GetColumn(x) == 1);
+
+            if (keypad != null)
+            {
+                keypad.Width = 160;
+                keypad.Height = 250;
+                keypad.MinHeight = 0;
+                keypad.MaxHeight = 250;
+                keypad.VerticalAlignment = VerticalAlignment.Top;
+                keypad.HorizontalAlignment = HorizontalAlignment.Stretch;
+                keypad.Margin = new Thickness(0);
+
+                if (keypad.RowDefinitions.Count >= 2)
                 {
-                    button.Height = 42;
-                    button.MinHeight = 42;
-                    button.MaxHeight = 42;
-                    button.Margin = new Thickness(2);
-                    button.FontSize = 16;
-                    button.Padding = new Thickness(1);
-                    button.VerticalAlignment = VerticalAlignment.Center;
+                    keypad.RowDefinitions[0].Height = new GridLength(210);
+                    keypad.RowDefinitions[1].Height = new GridLength(40);
+                }
+
+                var keypadBorder = keypad.Children
+                    .OfType<Border>()
+                    .FirstOrDefault(x => Grid.GetRow(x) == 0);
+
+                if (keypadBorder?.Child is UniformGrid uniformGrid)
+                {
+                    keypadBorder.Height = 210;
+                    keypadBorder.MinHeight = 0;
+                    keypadBorder.MaxHeight = 210;
+                    keypadBorder.Padding = new Thickness(3);
+                    uniformGrid.Height = 204;
+                    uniformGrid.MinHeight = 0;
+                    uniformGrid.MaxHeight = 204;
+                    uniformGrid.Margin = new Thickness(0);
+
+                    foreach (var button in uniformGrid.Children.OfType<Button>())
+                    {
+                        button.Height = 42;
+                        button.MinHeight = 42;
+                        button.MaxHeight = 42;
+                        button.Margin = new Thickness(2);
+                        button.FontSize = 16;
+                        button.Padding = new Thickness(1);
+                        button.VerticalAlignment = VerticalAlignment.Center;
+                    }
+                }
+
+                foreach (var button in keypad.Children.OfType<Button>())
+                {
+                    button.Height = 36;
+                    button.MinHeight = 36;
+                    button.MaxHeight = 36;
                 }
             }
 
-            foreach (var button in keypad.Children.OfType<Button>())
+            foreach (var button in paymentGrid.Children
+                         .OfType<StackPanel>()
+                         .SelectMany(x => x.Children.OfType<Button>()))
             {
-                button.Height = 36;
-                button.MinHeight = 36;
-                button.MaxHeight = 36;
+                button.MinHeight = Math.Max(button.MinHeight, 34);
             }
-        }
 
-        foreach (var button in paymentGrid.Children
-                     .OfType<StackPanel>()
-                     .SelectMany(x => x.Children.OfType<Button>()))
+            var chargeButton = FindDescendant<Button>(paymentGrid, "ChargeButton");
+            if (chargeButton != null)
+            {
+                chargeButton.Height = 38;
+                chargeButton.MinHeight = 38;
+            }
+
+            // Cash remains the default after every Loaded handler has completed.
+            SelectPaymentMethod("Cash");
+        }
+        catch (Exception ex)
         {
-            button.MinHeight = Math.Max(button.MinHeight, 34);
-        }
+            // Layout polish must never be allowed to terminate POS startup.
+            try
+            {
+                Status("Ready", true);
+            }
+            catch
+            {
+                // Ignore secondary UI errors while recovering from layout problems.
+            }
 
-        var chargeButton = FindDescendant<Button>(paymentGrid, "ChargeButton");
-        if (chargeButton != null)
-        {
-            chargeButton.Height = 38;
-            chargeButton.MinHeight = 38;
+            System.Diagnostics.Debug.WriteLine(
+                $"[ResponsiveLayout] {ex.GetType().Name}: {ex.Message}");
         }
-
-        // Cash is the default payment method. Run after the instance Loaded
-        // handler so the existing initialization cannot switch it back to Card.
-        window.Dispatcher.BeginInvoke(
-            DispatcherPriority.Loaded,
-            new Action(() => window.SelectPaymentMethod("Cash")));
     }
 
     private static T? FindDescendant<T>(DependencyObject root, string name) where T : FrameworkElement
