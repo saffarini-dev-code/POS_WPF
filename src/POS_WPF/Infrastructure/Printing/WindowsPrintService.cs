@@ -1,9 +1,10 @@
 using System.Printing;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Xps;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Data;
 
@@ -15,6 +16,7 @@ public sealed class WindowsPrintService(IDbContextFactory<AppDbContext> dbFactor
     {
         var content = await AddConfiguredTaxToReceiptAsync(request.Content, cancellationToken);
         await PrintVisualAsync(request with { Content = content }, BuildDocument(content), cancellationToken);
+        await TryOpenCashDrawerAsync(request.PrinterName, request.Content, cancellationToken);
     }
 
     public Task PrintLabelAsync(PrintDocumentRequest request, CancellationToken cancellationToken = default)
@@ -35,6 +37,34 @@ public sealed class WindowsPrintService(IDbContextFactory<AppDbContext> dbFactor
 
         lines.Insert(totalIndex, $"TAX: {sale.Tax:N2}");
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private async Task TryOpenCashDrawerAsync(string printerName, string receiptContent, CancellationToken cancellationToken)
+    {
+        var number = receiptContent.Split(['\r', '\n'], StringSplitOptions.None)
+            .FirstOrDefault(x => x.StartsWith("S-", StringComparison.OrdinalIgnoreCase))?.Trim();
+        if (string.IsNullOrWhiteSpace(number)) return;
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var sale = await db.Sales.AsNoTracking()
+                .Include(x => x.Payments)
+                .SingleOrDefaultAsync(x => x.Number == number, cancellationToken);
+            if (sale is null || !sale.Payments.Any(x => string.Equals(x.Method, "Cash", StringComparison.OrdinalIgnoreCase))) return;
+
+            var server = new LocalPrintServer();
+            var queue = string.IsNullOrWhiteSpace(printerName)
+                ? server.DefaultPrintQueue
+                : server.GetPrintQueue(printerName);
+
+            // Standard ESC/POS cash-drawer pulse: pin 2, 25ms ON / 250ms OFF.
+            RawPrinter.Send(queue.Name, new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA });
+        }
+        catch
+        {
+            // Drawer hardware must never turn a successfully printed sale into a failed sale.
+        }
     }
 
     private static FlowDocument BuildDocument(string content)
@@ -63,5 +93,55 @@ public sealed class WindowsPrintService(IDbContextFactory<AppDbContext> dbFactor
         var paginator = ((IDocumentPaginatorSource)document).DocumentPaginator;
         writer.Write(paginator);
         return Task.CompletedTask;
+    }
+
+    private static class RawPrinter
+    {
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private sealed class DocInfo
+        {
+            public string DocName = "POS Cash Drawer";
+            public string? OutputFile;
+            public string DataType = "RAW";
+        }
+
+        [DllImport("winspool.drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool OpenPrinter(string name, out nint printer, nint defaults);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        private static extern bool ClosePrinter(nint printer);
+
+        [DllImport("winspool.drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern int StartDocPrinter(nint printer, int level, [In] DocInfo docInfo);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        private static extern bool EndDocPrinter(nint printer);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        private static extern bool StartPagePrinter(nint printer);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        private static extern bool EndPagePrinter(nint printer);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        private static extern bool WritePrinter(nint printer, byte[] buffer, int count, out int written);
+
+        public static void Send(string printerName, byte[] data)
+        {
+            if (!OpenPrinter(printerName, out var printer, 0)) return;
+            try
+            {
+                var doc = new DocInfo();
+                if (StartDocPrinter(printer, 1, doc) == 0) return;
+                try
+                {
+                    if (!StartPagePrinter(printer)) return;
+                    try { WritePrinter(printer, data, data.Length, out _); }
+                    finally { EndPagePrinter(printer); }
+                }
+                finally { EndDocPrinter(printer); }
+            }
+            finally { ClosePrinter(printer); }
+        }
     }
 }
