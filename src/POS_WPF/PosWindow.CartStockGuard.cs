@@ -24,13 +24,21 @@ public partial class PosWindow
 
     private async Task TryIncreaseCartQuantityAsync(CartItem item)
     {
-        var requested = item.Quantity + 1m;
-        if (!await HasSufficientStockAsync(item.ProductId, item.UnitId, requested))
+        await _inventoryMutationGate.WaitAsync();
+        try
         {
-            Status("المخزون لا يكفي للإضافة.", false);
-            return;
+            var requested = item.Quantity + 1m;
+            if (!await HasSufficientStockAsync(item.ProductId, item.UnitId, requested))
+            {
+                Status("المخزون لا يكفي للإضافة.", false);
+                return;
+            }
+            item.Quantity = requested;
+            await RecalculateLineAsync(item);
         }
-        item.Quantity = requested;
-        await RecalculateLineAsync(item);
+        finally
+        {
+            _inventoryMutationGate.Release();
+        }
     }
 }
