@@ -177,10 +177,7 @@ public partial class PosWindow
         StatusText.FontSize = 9;
         StatusText.Margin = new Thickness(0, 2, 0, 0);
         StatusText.HorizontalAlignment = HorizontalAlignment.Left;
-        Grid.SetRow(StatusText, 6);
         StatusText.Visibility = Visibility.Collapsed;
-        paymentContent.Children.Add(StatusText);
-
         paymentGrid.Children.Add(paymentContent);
 
         HookResponsiveCashierSizing();
@@ -205,7 +202,8 @@ public partial class PosWindow
         var width = Math.Max(180, Math.Floor((PopularProductsPanel.ActualWidth - 40) / 5.0));
         foreach (var button in FindVisualChildren<Button>(PopularProductsPanel))
         {
-            if (button.ClickMode != ClickMode.Hover) continue;
+            // Product cards have no Tag; the small Check Product action inside each card does.
+            if (button.Tag is not null) continue;
             button.Width = width;
             button.Height = 86;
             button.Margin = new Thickness(5);
