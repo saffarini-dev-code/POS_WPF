@@ -1,0 +1,61 @@
+name: Finalize POS fix
+
+on:
+  push:
+    branches: [ ci-production ]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ci-production
+          fetch-depth: 0
+
+      - name: Finalize source
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          root = Path.cwd()
+
+          tax = root / 'src/POS_WPF/PosWindow.Tax.cs'
+          text = tax.read_text(encoding='utf-8')
+          text = text.replace('        AttachTaxVisibilityWatcher();\n', '')
+          if 'private void AttachTaxVisibilityWatcher()' not in text:
+              text = text.replace('    private void Cart_CollectionChangedForTax', '    private void AttachTaxVisibilityWatcher() { }\n\n    private void Cart_CollectionChangedForTax', 1)
+          tax.write_text(text, encoding='utf-8')
+
+          xaml = root / 'src/POS_WPF/PosWindow.xaml'
+          text = xaml.read_text(encoding='utf-8')
+          text = text.replace(
+              'Text="{Binding UnitName, StringFormat=/ {0}}"',
+              'Text="{Binding UnitName, StringFormat={} / {0}}"',
+              1)
+          xaml.write_text(text, encoding='utf-8')
+
+          subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+          subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          subprocess.run(['git', 'add', 'src/POS_WPF/PosWindow.Tax.cs', 'src/POS_WPF/PosWindow.xaml'], check=True)
+          if subprocess.run(['git', 'diff', '--cached', '--quiet']).returncode != 0:
+              subprocess.run(['git', 'commit', '-m', 'Finalize POS tax UI and unit label fix'], check=True)
+              subprocess.run(['git', 'push', 'origin', 'HEAD:ci-production'], check=True)
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore POS_WPF.sln
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build POS_WPF.sln --configuration Release --no-restore
+
+      - name: Business verification
+        shell: pwsh
+        run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
