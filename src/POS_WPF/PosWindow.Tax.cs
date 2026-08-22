@@ -1,6 +1,6 @@
 using System.Windows;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
 using POS_WPF.Domain.Settings;
 
@@ -18,11 +18,17 @@ public partial class PosWindow
     {
         base.OnInitialized(e);
 
-        // Tax settings are loaded once when the POS is actually displayed.
-        // Do not attach global TextChanged/Click handlers here: they fire for
-        // every control during startup and can cause re-entrant total refreshes.
+        // Load tax settings only when POS is displayed. Do not attach global
+        // TextChanged/Click handlers: they fire for many controls during
+        // startup and can cause re-entrant total refreshes.
         Loaded += TaxSettings_Loaded;
         AttachTaxVisibilityWatcher();
+
+        // PosWindow.xaml.cs currently selects Card in its Loaded handler.
+        // Schedule Cash after all Loaded handlers so Cash is the real default.
+        Loaded += (_, _) => Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => SelectPaymentMethod("Cash")));
     }
 
     private async void TaxSettings_Loaded(object? sender, RoutedEventArgs e)
@@ -53,9 +59,6 @@ public partial class PosWindow
         {
             // Never allow optional tax UI initialization to crash POS startup.
         }
-
-        // Cash is the default payment method for a new POS sale.
-        SelectPaymentMethod("Cash");
     }
 
     private void RefreshTaxAndTotals()
