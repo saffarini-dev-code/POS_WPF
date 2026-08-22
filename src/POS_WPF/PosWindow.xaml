@@ -60,41 +60,6 @@
             <Setter Property="Margin" Value="3"/>
             <Setter Property="Padding" Value="2"/>
         </Style>
-        <Style x:Key="ZeroHiddenText" TargetType="TextBlock">
-            <Setter Property="Visibility" Value="Visible"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0.00">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="ZeroDiscountText" TargetType="TextBlock">
-            <Setter Property="Visibility" Value="Visible"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Text, ElementName=DiscountText}" Value="0.00">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Text, ElementName=DiscountText}" Value="0">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="EmptyCartChargeStyle" TargetType="Button" BasedOn="{StaticResource BaseButton}">
-            <Setter Property="Background" Value="#20A64A"/>
-            <Setter Property="BorderBrush" Value="#20A64A"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Content" Value="CHARGE"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasItems, ElementName=CartGrid}" Value="False">
-                    <Setter Property="Background" Value="#B8E7C9"/>
-                    <Setter Property="BorderBrush" Value="#B8E7C9"/>
-                    <Setter Property="Content" Value="No items in cart"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
         <Style TargetType="TextBox">
             <Setter Property="BorderBrush" Value="#D7DEE8"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -196,9 +161,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="PopularProductsPanel">
                             <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel/>
-                                </ItemsPanelTemplate>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -248,8 +211,7 @@
                     </Border>
 
                     <Grid Grid.Row="1" Background="White">
-                        <ListView x:Name="CartGrid" Background="White" BorderThickness="0"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListView x:Name="CartGrid" Background="White" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="#EEF1F5" BorderThickness="0,0,0,1" Padding="10,8">
@@ -274,8 +236,7 @@
                                                 <TextBlock Text="{Binding Quantity,StringFormat=N0}" Width="28" TextAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"/>
                                                 <Button Content="+" Tag="{Binding}" Width="26" Height="26" Click="IncreaseQuantity_Click" Style="{StaticResource BaseButton}"/>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="{Binding LineTotal,StringFormat=N2}" Width="58"
-                                                       TextAlignment="Right" VerticalAlignment="Center" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding LineTotal,StringFormat=N2}" Width="58" TextAlignment="Right" VerticalAlignment="Center" FontSize="11" FontWeight="Bold"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -308,11 +269,10 @@
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <Grid Grid.Row="0" Grid.Column="0">
-                                <TextBox x:Name="InvoiceDiscountBox" Height="30" Text="0.00"
-                                         TextAlignment="Left" GotKeyboardFocus="InvoiceDiscountBox_GotKeyboardFocus"
-                                         LostKeyboardFocus="InvoiceDiscountBox_LostKeyboardFocus"/>
-                                <TextBlock Text="COUPON CODE" FontSize="8" Foreground="#94A3B8"
-                                           VerticalAlignment="Center" Margin="10,0,0,0" IsHitTestVisible="False">
+                                <TextBox x:Name="InvoiceDiscountBox" Height="30" Text="0.00" TextAlignment="Left"
+                                         GotKeyboardFocus="InvoiceDiscountBox_GotKeyboardFocus" LostKeyboardFocus="InvoiceDiscountBox_LostKeyboardFocus"/>
+                                <TextBlock Text="COUPON CODE" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Center"
+                                           Margin="10,0,0,0" IsHitTestVisible="False">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -329,15 +289,50 @@
                                     Click="ApplyInvoiceDiscount_Click" Style="{StaticResource BaseButton}" FontSize="10"/>
                             <TextBlock Grid.Row="1" Text="Subtotal" FontSize="10" Foreground="#64748B" Margin="0,6,0,0"/>
                             <TextBlock x:Name="SubtotalText" Grid.Row="1" Grid.Column="1" Text="0.00" FontSize="10" Margin="0,6,0,0"/>
-                            <TextBlock Grid.Row="2" Text="Discount" FontSize="10" Foreground="#64748B" Style="{StaticResource ZeroDiscountText}"/>
-                            <TextBlock x:Name="DiscountText" Grid.Row="2" Grid.Column="1" Text="0.00" FontSize="10" Style="{StaticResource ZeroDiscountText}" TextAlignment="Right"/>
-                            <TextBlock x:Name="TaxLabel" Grid.Row="3" Text="Tax" FontSize="10" Foreground="#64748B" Style="{StaticResource ZeroHiddenText}"/>
-                            <TextBlock x:Name="TaxText" Grid.Row="3" Grid.Column="1" Text="{Binding Text, ElementName=ReceiptTaxText}" FontSize="10" Style="{StaticResource ZeroHiddenText}" TextAlignment="Right"/>
+                            <TextBlock Grid.Row="2" Text="Discount" FontSize="10" Foreground="#64748B">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=DiscountText}" Value="0.00"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=DiscountText}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock x:Name="DiscountText" Grid.Row="2" Grid.Column="1" Text="0.00" FontSize="10" TextAlignment="Right">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <Trigger Property="Text" Value="0.00"><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                                            <Trigger Property="Text" Value="0"><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock x:Name="TaxLabel" Grid.Row="3" Text="Tax" FontSize="10" Foreground="#64748B">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0.00"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock x:Name="TaxText" Grid.Row="3" Grid.Column="1" Text="{Binding Text, ElementName=ReceiptTaxText}" FontSize="10" TextAlignment="Right">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0.00"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=ReceiptTaxText}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <Border Grid.Row="4" Grid.ColumnSpan="2" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="0,5,0,0">
                                 <Grid>
                                     <TextBlock Text="TOTAL" FontSize="15" FontWeight="Bold"/>
-                                    <TextBlock x:Name="TotalText" Text="0.00" HorizontalAlignment="Right" FontSize="17"
-                                               FontWeight="Bold" Foreground="#16A34A"/>
+                                    <TextBlock x:Name="TotalText" Text="0.00" HorizontalAlignment="Right" FontSize="17" FontWeight="Bold" Foreground="#16A34A"/>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -348,7 +343,6 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="160"/>
                         </Grid.ColumnDefinitions>
-
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
                             <TextBlock Text="PAYMENT METHOD" FontSize="8" Foreground="#94A3B8" FontWeight="SemiBold" Margin="0,0,0,6"/>
                             <Grid>
@@ -358,19 +352,30 @@
                                 <Button x:Name="MobileButton" Grid.Column="2" Content="▥ Mobile" Tag="Mobile" Style="{StaticResource PayButtonStyle}" Click="PaymentMethod_Click" Margin="0"/>
                             </Grid>
                             <TextBlock Text="AMOUNT RECEIVED" FontSize="8" Foreground="#94A3B8" Margin="0,7,0,3"/>
-                            <TextBox x:Name="PaymentBox" Text="0.00" Height="34" FontSize="16" FontWeight="Bold"
-                                     TextAlignment="Right" VerticalContentAlignment="Center"
-                                     GotKeyboardFocus="KeypadTarget_GotKeyboardFocus" TextChanged="PaymentBox_TextChanged"/>
+                            <TextBox x:Name="PaymentBox" Text="0.00" Height="34" FontSize="16" FontWeight="Bold" TextAlignment="Right" VerticalContentAlignment="Center" GotKeyboardFocus="KeypadTarget_GotKeyboardFocus" TextChanged="PaymentBox_TextChanged"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBlock Text="Change" FontSize="8" Foreground="#94A3B8" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="ChangeText" Text="0.00" FontSize="11" FontWeight="Bold" Foreground="#16A34A" Margin="6,0,0,0"/>
                             </StackPanel>
-                            <Button x:Name="ChargeButton" Height="34" Margin="0,7,0,0"
-                                    Click="Complete_Click" Style="{StaticResource EmptyCartChargeStyle}" FontSize="10"/>
-                            <TextBlock x:Name="StatusText" Text="Ready" FontSize="8" Foreground="#64748B" Margin="0,5,0,0"
-                                       TextTrimming="CharacterEllipsis"/>
+                            <Button x:Name="ChargeButton" Height="34" Margin="0,7,0,0" Click="Complete_Click" FontSize="10">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource BaseButton}">
+                                        <Setter Property="Background" Value="#20A64A"/>
+                                        <Setter Property="BorderBrush" Value="#20A64A"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="Content" Value="CHARGE"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasItems, ElementName=CartGrid}" Value="False">
+                                                <Setter Property="Background" Value="#B8E7C9"/>
+                                                <Setter Property="BorderBrush" Value="#B8E7C9"/>
+                                                <Setter Property="Content" Value="No items in cart"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <TextBlock x:Name="StatusText" Text="Ready" FontSize="8" Foreground="#64748B" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-
                         <Grid Grid.Column="1">
                             <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="34"/></Grid.RowDefinitions>
                             <Border Grid.Row="0" Background="#F6F8FB" BorderBrush="#DCE2EA" BorderThickness="1" CornerRadius="5" Padding="2">
@@ -403,8 +408,7 @@
         <Border Grid.Row="2" Background="#111827" Padding="10,0">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Button Content="⏻  Close POS" Width="104" Height="30" Click="ClosePos_Click"
-                        Background="#1F2937" Foreground="White" BorderBrush="#374151" Style="{StaticResource BaseButton}" FontSize="10"/>
+                <Button Content="⏻  Close POS" Width="104" Height="30" Click="ClosePos_Click" Background="#1F2937" Foreground="White" BorderBrush="#374151" Style="{StaticResource BaseButton}" FontSize="10"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="F1 Help" Foreground="#E5E7EB" FontSize="9" FontWeight="SemiBold" Margin="0,0,18,0"/>
                     <TextBlock Text="F2 Hold" Foreground="#E5E7EB" FontSize="9" FontWeight="SemiBold" Margin="0,0,18,0"/>
