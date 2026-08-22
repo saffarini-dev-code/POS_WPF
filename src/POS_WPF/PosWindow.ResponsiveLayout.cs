@@ -8,13 +8,22 @@ namespace POS_WPF;
 
 /// <summary>
 /// Applies the cashier layout after WPF has completed the initial measure/arrange pass.
-/// The previous implementation registered a static PosWindow constructor from this
-/// partial class. PosWindow already has another static constructor in the composed
-/// partial type, so C# reported CS0111. Responsive layout is now attached as a normal
-/// instance Loaded handler from PosWindow.xaml.cs.
+/// The registration is performed by a static field initializer so this partial class
+/// does not declare a second static PosWindow constructor.
 /// </summary>
 public partial class PosWindow
 {
+    private static readonly bool _responsiveLayoutRegistered = RegisterResponsiveLayoutHandler();
+
+    private static bool RegisterResponsiveLayoutHandler()
+    {
+        EventManager.RegisterClassHandler(
+            typeof(PosWindow),
+            FrameworkElement.LoadedEvent,
+            new RoutedEventHandler(OnPosWindowLoadedForResponsiveLayout));
+        return true;
+    }
+
     private static void OnPosWindowLoadedForResponsiveLayout(object sender, RoutedEventArgs e)
     {
         if (sender is not PosWindow window)
