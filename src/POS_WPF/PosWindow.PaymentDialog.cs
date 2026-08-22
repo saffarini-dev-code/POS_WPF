@@ -20,10 +20,10 @@ public partial class PosWindow
             !string.Equals(button.Name, "ChargeButton", StringComparison.Ordinal)) return;
 
         e.Handled = true;
-        window.ShowPaymentConfirmation();
+        _ = window.ShowPaymentConfirmationAsync();
     }
 
-    private void ShowPaymentConfirmation()
+    private async Task ShowPaymentConfirmationAsync()
     {
         var total = GetInvoiceTotal();
         if (_cart.Count == 0)
@@ -41,20 +41,35 @@ public partial class PosWindow
             return;
         }
 
-        var dialog = new PaymentConfirmationDialog(total, payment, _paymentMethod, this);
+        var dialog = new PaymentConfirmationDialog(total, payment, _paymentMethod, this, CompleteSaleFromPaymentDialogAsync);
         var previousOpacity = Opacity;
         Opacity = 0.72;
         try
         {
-            var confirmed = dialog.ShowDialog() == true;
-            if (confirmed)
-            {
-                Complete_Click(this, new RoutedEventArgs());
-            }
+            dialog.ShowDialog();
         }
         finally
         {
             if (IsVisible) Opacity = previousOpacity;
+            BarcodeBox.Focus();
         }
+    }
+
+    private async Task<bool> CompleteSaleFromPaymentDialogAsync()
+    {
+        if (_cart.Count == 0) return false;
+
+        var initialItemCount = _cart.Count;
+        Complete_Click(this, new RoutedEventArgs());
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+            if (_cart.Count == 0)
+                return true;
+        }
+
+        return initialItemCount > 0 && _cart.Count == 0;
     }
 }
