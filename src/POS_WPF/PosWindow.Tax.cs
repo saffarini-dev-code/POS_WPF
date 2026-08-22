@@ -4,7 +4,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
-using POS_WPF.Domain.Settings;
 
 namespace POS_WPF;
 
@@ -51,7 +50,7 @@ public partial class PosWindow
             _taxEnabled = settings?.IsEnabled == true;
             _taxRate = settings?.Rate ?? 0m;
             _pricesIncludeTax = settings?.PricesIncludeTax == true;
-            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;
+            _showTaxOnInvoice = _taxEnabled;
             _taxSettingsLoaded = true;
         }
         catch
