@@ -14,6 +14,8 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
@@ -29,8 +31,42 @@ jobs:
       - name: Restore
         run: dotnet restore POS_WPF.sln
 
+      - name: Apply POS receipt tax patch
+        shell: pwsh
+        run: |
+          $path = 'src/POS_WPF/PosWindow.xaml.cs'
+          $text = Get-Content $path -Raw
+          $old = '    private string BuildReceipt(string number, decimal total, decimal change) => $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";'
+          $new = @'
+              private string BuildReceipt(string number, decimal total, decimal change)
+              {
+                  var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);
+                  var discount = _cart.Sum(x => x.Discount) + _invoiceDiscount;
+                  var tax = _cart.Sum(x => x.Tax);
+                  var taxLine = _showTaxOnInvoice && tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;
+                  return $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}SUBTOTAL: {subtotal:N2}{Environment.NewLine}DISCOUNT: {discount:N2}{Environment.NewLine}{taxLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";
+              }
+          '@
+          if ($text.Contains($old)) {
+            $text = $text.Replace($old, $new.TrimEnd())
+            Set-Content -Path $path -Value $text -Encoding UTF8
+          }
+
       - name: Build
         run: dotnet build POS_WPF.sln --configuration Release --no-restore
 
       - name: Business verification
         run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
+
+      - name: Commit receipt tax patch
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/POS_WPF/PosWindow.xaml.cs
+          if (git diff --cached --quiet) {
+            Write-Host 'Receipt tax patch already applied; nothing to commit.'
+            exit 0
+          }
+          git commit -m 'Include tax on POS receipt when tax is enabled'
+          git push origin HEAD:${{ github.ref_name }}
