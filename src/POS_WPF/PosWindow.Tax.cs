@@ -49,7 +49,8 @@ public partial class PosWindow
             _taxEnabled = settings?.IsEnabled == true;
             _taxRate = settings?.Rate ?? 0m;
             _pricesIncludeTax = settings?.PricesIncludeTax == true;
-            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;
+            // When tax is enabled it must be visible in both the POS totals and the receipt.
+            _showTaxOnInvoice = _taxEnabled;
             _taxSettingsLoaded = true;
         }
         catch
@@ -100,6 +101,9 @@ public partial class PosWindow
             ReceiptTotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
             TotalText.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
             PaymentBox.Text = total.ToString("N2", System.Globalization.CultureInfo.CurrentCulture);
+            TaxLabel.Text = _taxEnabled && _taxRate > 0m ? $"Tax ({_taxRate:0.##}%)" : "Tax";
+            TaxLabel.Visibility = _taxEnabled && _invoiceTax > 0m ? Visibility.Visible : Visibility.Collapsed;
+            TaxText.Visibility = _taxEnabled && _invoiceTax > 0m ? Visibility.Visible : Visibility.Collapsed;
             CartGrid.Items.Refresh();
             ReceiptItemsPanel.Items.Refresh();
         }
