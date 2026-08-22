@@ -29,9 +29,8 @@ public partial class PosWindow
 
     /// <summary>
     /// The XAML is the single source of truth for the cashier layout.
-    /// Do not detach/re-parent named controls here: doing so can leave WPF
-    /// controls attached to two logical parents and causes InvalidOperationException.
-    /// This method only adjusts existing row/column sizing.
+    /// Never detach or re-parent named controls during Loaded; doing that can
+    /// cause WPF InvalidOperationException when a control is already attached.
     /// </summary>
     private void ApplyCashierReferenceLayout()
     {
@@ -61,10 +60,26 @@ public partial class PosWindow
             rightPanel.RowDefinitions[0].Height = new GridLength(58);
             rightPanel.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
             rightPanel.RowDefinitions[2].Height = new GridLength(120);
+            // Enough vertical room for the 4x3 touch keypad plus Hold/Recall.
             rightPanel.RowDefinitions[3].Height = new GridLength(190);
+            ResizeTouchKeypad(rightPanel);
         }
 
         HookResponsiveCashierSizing();
+    }
+
+    private static void ResizeTouchKeypad(DependencyObject rightPanel)
+    {
+        foreach (var keypad in FindVisualChildren<UniformGrid>(rightPanel))
+        {
+            foreach (var button in keypad.Children.OfType<Button>())
+            {
+                button.Height = 40;
+                button.Margin = new Thickness(2);
+                button.Padding = new Thickness(2);
+                button.FontSize = 17;
+            }
+        }
     }
 
     private void HookResponsiveCashierSizing()
