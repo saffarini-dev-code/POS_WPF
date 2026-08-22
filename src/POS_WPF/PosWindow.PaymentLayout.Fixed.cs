@@ -21,7 +21,16 @@ public partial class PosWindow
         if (paymentGrid is null) return;
         _paymentLayoutFixedApplied = true;
 
-        if (CardButton.Parent is Panel oldPanel) oldPanel.Children.Clear();
+        // These controls already belong to the original payment layout.
+        // WPF does not allow a UIElement to have two logical/visual parents,
+        // so detach every control before rebuilding the payment area.
+        DetachFixedElement(CardButton);
+        DetachFixedElement(CashButton);
+        DetachFixedElement(MobileButton);
+        DetachFixedElement(PaymentBox);
+        DetachFixedElement(ChangeText);
+        DetachFixedElement(StatusText);
+
         paymentGrid.Children.Clear();
         paymentGrid.RowDefinitions.Clear();
         paymentGrid.ColumnDefinitions.Clear();
@@ -165,6 +174,22 @@ public partial class PosWindow
         Grid.SetColumn(recall, 1);
         holdRecall.Children.Add(recall);
         right.Children.Add(holdRecall);
+    }
+
+    private static void DetachFixedElement(FrameworkElement element)
+    {
+        switch (element.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(element);
+                break;
+            case ContentControl contentControl when ReferenceEquals(contentControl.Content, element):
+                contentControl.Content = null;
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, element):
+                decorator.Child = null;
+                break;
+        }
     }
 
     private void HookFixedTaxVisibility()
