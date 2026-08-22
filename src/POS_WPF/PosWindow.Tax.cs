@@ -1,8 +1,10 @@
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
+using POS_WPF.Domain.Settings;
 
 namespace POS_WPF;
 
@@ -27,6 +29,7 @@ public partial class PosWindow
     {
         base.OnInitialized(e);
         Loaded += TaxSettings_Loaded;
+        AttachTaxVisibilityWatcher();
         _cart.CollectionChanged += Cart_CollectionChangedForTax;
         InitializeCartUi();
         Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SelectPaymentMethod("Cash")));
@@ -113,5 +116,15 @@ public partial class PosWindow
         if (_pricesIncludeTax)
             return Math.Round(taxableAmount - taxableAmount / (1m + _taxRate / 100m), 2, MidpointRounding.AwayFromZero);
         return Math.Round(taxableAmount * (_taxRate / 100m), 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static bool IsDescendantOf(DependencyObject? source, DependencyObject ancestor)
+    {
+        while (source is not null)
+        {
+            if (ReferenceEquals(source, ancestor)) return true;
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return false;
     }
 }
