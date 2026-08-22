@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -13,22 +14,32 @@ public partial class PosWindow
     private decimal _taxRate;
     private bool _pricesIncludeTax;
     private bool _taxRefreshInProgress;
+    private bool _showTaxOnInvoice;
 
     protected override void OnInitialized(EventArgs e)
     {
         base.OnInitialized(e);
 
-        // Load tax settings only when POS is displayed. Do not attach global
-        // TextChanged/Click handlers: they fire for many controls during
-        // startup and can cause re-entrant total refreshes.
         Loaded += TaxSettings_Loaded;
         AttachTaxVisibilityWatcher();
 
-        // PosWindow.xaml.cs currently selects Card in its Loaded handler.
-        // Schedule Cash after all Loaded handlers so Cash is the real default.
+        // Recalculate tax whenever products are added/removed from the cart.
+        // Quantity/discount changes are explicitly refreshed by the cart controls.
+        _cart.CollectionChanged += Cart_CollectionChangedForTax;
+
+        // Load the programmatic cart template after InitializeComponent has created
+        // all named controls, while keeping the existing XAML layout intact.
+        InitializeCartUi();
+
         Loaded += (_, _) => Dispatcher.BeginInvoke(
             DispatcherPriority.Background,
             new Action(() => SelectPaymentMethod("Cash")));
+    }
+
+    private void Cart_CollectionChangedForTax(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RefreshTaxAndTotals));
     }
 
     private async void TaxSettings_Loaded(object? sender, RoutedEventArgs e)
@@ -40,14 +51,15 @@ public partial class PosWindow
             _taxEnabled = settings?.IsEnabled == true;
             _taxRate = settings?.Rate ?? 0m;
             _pricesIncludeTax = settings?.PricesIncludeTax == true;
+            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;
             _taxSettingsLoaded = true;
         }
         catch
         {
-            // POS must still open when tax configuration cannot be read.
             _taxEnabled = false;
             _taxRate = 0m;
             _pricesIncludeTax = false;
+            _showTaxOnInvoice = false;
             _taxSettingsLoaded = true;
         }
 
@@ -57,7 +69,7 @@ public partial class PosWindow
         }
         catch
         {
-            // Never allow optional tax UI initialization to crash POS startup.
+            // Tax is optional UI behavior; never let its initialization crash POS.
         }
     }
 
@@ -69,18 +81,16 @@ public partial class PosWindow
         {
             _taxRefreshInProgress = true;
             var invoiceDiscountRemaining = Math.Max(0m, _invoiceDiscount);
-            var invoiceDiscountApplied = false;
 
             foreach (var item in _cart)
             {
                 var lineBase = Math.Max(0m, item.Quantity * item.UnitPrice - item.ManualDiscount - item.PromotionDiscount);
 
-                if (!invoiceDiscountApplied && invoiceDiscountRemaining > 0m)
+                if (invoiceDiscountRemaining > 0m)
                 {
                     var applied = Math.Min(lineBase, invoiceDiscountRemaining);
                     lineBase -= applied;
                     invoiceDiscountRemaining -= applied;
-                    invoiceDiscountApplied = invoiceDiscountRemaining <= 0m;
                 }
 
                 item.Tax = _taxEnabled ? CalculateTax(lineBase) : 0m;
