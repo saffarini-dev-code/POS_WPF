@@ -9,5 +9,6 @@ public sealed class Product
     public Guid? CategoryId { get; set; }
     public bool IsActive { get; set; } = true;
     public Guid BaseUnitId { get; set; }
+    public decimal ReorderLevel { get; set; }
     public ICollection<ProductUnit> Units { get; set; } = new List<ProductUnit>();
 }
