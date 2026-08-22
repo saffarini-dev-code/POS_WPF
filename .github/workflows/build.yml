@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, feature/**, ci-production ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore POS_WPF.sln
+
+      - name: Build
+        run: dotnet build POS_WPF.sln --configuration Release --no-restore
+
+      - name: Business verification
+        run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify

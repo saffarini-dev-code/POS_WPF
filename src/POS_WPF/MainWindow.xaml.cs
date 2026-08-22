@@ -1,0 +1,85 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace POS_WPF;
+
+public partial class MainWindow : Window
+{
+    private readonly IServiceProvider _services;
+
+    public MainWindow(IServiceProvider services)
+    {
+        InitializeComponent();
+        _services = services;
+        Loaded += (_, _) => OpenDashboard_Click(this, new RoutedEventArgs());
+    }
+
+    private void SetPage(FrameworkElement page, string title, string subtitle) { ContentHost.Content = page; PageTitleText.Text = title; PageSubtitleText.Text = subtitle; }
+
+    private void OpenDashboard_Click(object sender, RoutedEventArgs e)
+    {
+        var grid = new Grid();
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var cards = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, 0, 18) };
+        cards.Children.Add(MetricCard("Today's Sales", "0.00", "↗")); cards.Children.Add(MetricCard("Transactions", "0", "▤")); cards.Children.Add(MetricCard("Low Stock", "0", "⚠")); cards.Children.Add(MetricCard("Open Register", "Ready", "▰"));
+        Grid.SetRow(cards, 0); grid.Children.Add(cards);
+        var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var quick = new Border { Background = System.Windows.Media.Brushes.White, CornerRadius = new CornerRadius(14), Padding = new Thickness(22), Margin = new Thickness(0, 0, 12, 0) };
+        var quickStack = new StackPanel(); quickStack.Children.Add(new TextBlock { Text = "Quick Actions", FontSize = 20, FontWeight = FontWeights.SemiBold });
+        var wrap = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
+        wrap.Children.Add(ActionCard("▤", "New Sale", OpenPos_Click)); wrap.Children.Add(ActionCard("▥", "Store", OpenStore_Click)); wrap.Children.Add(ActionCard("▦", "Categories", OpenCategories_Click)); wrap.Children.Add(ActionCard("▣", "Products", OpenProducts_Click)); wrap.Children.Add(ActionCard("▤", "Inventory", OpenInventory_Click)); wrap.Children.Add(ActionCard("★", "Promotions", OpenPromotions_Click)); wrap.Children.Add(ActionCard("▥", "Reports", OpenReports_Click));
+        quickStack.Children.Add(wrap); quick.Child = quickStack; Grid.SetColumn(quick, 0); body.Children.Add(quick);
+        var status = new Border { Background = System.Windows.Media.Brushes.White, CornerRadius = new CornerRadius(14), Padding = new Thickness(22), Margin = new Thickness(12, 0, 0, 0) };
+        var ss = new StackPanel(); ss.Children.Add(new TextBlock { Text = "System Status", FontSize = 20, FontWeight = FontWeights.SemiBold }); ss.Children.Add(StatusLine("●", "Local database", "Ready")); ss.Children.Add(StatusLine("✓", "Atomic sales posting", "Enabled")); ss.Children.Add(StatusLine("↻", "Offline queue", "Ready"));
+        status.Child = ss; Grid.SetColumn(status, 1); body.Children.Add(status); Grid.SetRow(body, 1); grid.Children.Add(body);
+        SetPage(new Border { Child = grid }, "Dashboard", "Enterprise retail operations");
+    }
+
+    private Border MetricCard(string label, string value, string icon)
+    {
+        var s = new StackPanel(); s.Children.Add(new TextBlock { Text = icon, FontSize = 20, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(37, 99, 235)) }); s.Children.Add(new TextBlock { Text = label, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 116, 139)), Margin = new Thickness(0, 8, 0, 0) }); s.Children.Add(new TextBlock { Text = value, FontSize = 26, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 4, 0, 0) });
+        return new Border { Background = System.Windows.Media.Brushes.White, CornerRadius = new CornerRadius(14), Padding = new Thickness(18), Margin = new Thickness(0, 0, 8, 0), Child = s };
+    }
+
+    private Button ActionCard(string icon, string text, RoutedEventHandler handler)
+    {
+        var b = new Button { Content = new StackPanel { Children = { new TextBlock { Text = icon, FontSize = 22, HorizontalAlignment = HorizontalAlignment.Center }, new TextBlock { Text = text, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 0) } } }, MinWidth = 135, Height = 72, Margin = new Thickness(0, 0, 10, 10) };
+        b.Click += handler; return b;
+    }
+
+    private StackPanel StatusLine(string icon, string label, string value)
+    {
+        var s = new StackPanel { Margin = new Thickness(0, 20, 0, 0) }; s.Children.Add(new TextBlock { Text = $"{icon}  {label}", Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 116, 139)) }); s.Children.Add(new TextBlock { Text = value, FontWeight = FontWeights.SemiBold, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(22, 163, 74)), Margin = new Thickness(0, 4, 0, 0) }); return s;
+    }
+
+    private void OpenPos_Click(object sender, RoutedEventArgs e)
+    {
+        var pos = _services.GetRequiredService<PosWindow>();
+        pos.Owner = this;
+        pos.Closed += Pos_Closed;
+        Hide();
+        pos.Show();
+    }
+
+    private void Pos_Closed(object? sender, EventArgs e)
+    {
+        if (sender is Window pos) pos.Closed -= Pos_Closed;
+        Show(); Activate();
+    }
+
+    private void OpenStore_Click(object sender, RoutedEventArgs e) => SetPage(_services.GetRequiredService<StoreManagementWindow>(), "Store Management", "Store identity, branding and contact details");
+    private void OpenCategories_Click(object sender, RoutedEventArgs e) => SetPage(_services.GetRequiredService<CategoryManagementWindow>(), "Categories", "Organize your product catalog");
+    private void OpenProducts_Click(object sender, RoutedEventArgs e) => SetPage(_services.GetRequiredService<ProductManagementWindow>(), "Products", "Products, units, conversion and pricing");
+    private void OpenInventory_Click(object sender, RoutedEventArgs e) => SetPage(_services.GetRequiredService<InventoryManagementWindow>(), "Inventory", "Stock balances and warehouse control");
+    private void OpenPromotions_Click(object sender, RoutedEventArgs e) => SetPage(_services.GetRequiredService<PromotionsWindow>(), "Promotions", "Scheduled offers and quantity deals");
+
+    private void OpenWindow<T>(string title, string subtitle) where T : Window { var w = _services.GetRequiredService<T>(); w.Owner = this; w.WindowState = WindowState.Maximized; w.Show(); }
+    private void OpenCashRegister_Click(object sender, RoutedEventArgs e) => OpenWindow<CashRegisterWindow>("Cash Register", "");
+    private void OpenReports_Click(object sender, RoutedEventArgs e) => OpenWindow<ReportsWindow>("Reports", "");
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) => OpenWindow<SettingsWindow>("Settings", "");
+    private void OpenCustomers_Click(object sender, RoutedEventArgs e) => OpenWindow<AccountsWindow>("Customers", "");
+    private void OpenSuppliers_Click(object sender, RoutedEventArgs e) => OpenWindow<AccountsWindow>("Suppliers", "");
+}

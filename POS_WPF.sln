@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{60DC8134-BA46-4B99-948A-D0A82C5A9AD9}") = "POS_WPF", "POS_WPF\POS_WPF.csproj", "{B5A1A4F0-1EA5-4D41-A1EE-6F7FA3B9D001}"
+Project("{60DC8134-BA46-4B99-948A-D0A82C5A9AD9}") = "POS_WPF", "src\POS_WPF\POS_WPF.csproj", "{B5A1A4F0-1EA5-4D41-A1EE-6F7FA3B9D001}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

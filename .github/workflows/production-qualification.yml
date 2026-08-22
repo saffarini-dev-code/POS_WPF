@@ -1,0 +1,50 @@
+name: Production Qualification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ ci-production ]
+
+jobs:
+  qualification:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore POS_WPF.sln
+
+      - name: Release build
+        run: dotnet build POS_WPF.sln --configuration Release --no-restore
+
+      - name: Business verification
+        run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
+
+      - name: Publish smoke test
+        shell: pwsh
+        run: |
+          dotnet publish src/POS_WPF/POS_WPF.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output artifacts/qualification
+          if (-not (Test-Path 'artifacts/qualification/POS_WPF.exe')) { throw 'Publish executable missing.' }
+
+      - name: Package integrity smoke test
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash 'artifacts/qualification/POS_WPF.exe' -Algorithm SHA256).Hash
+          if ([string]::IsNullOrWhiteSpace($hash)) { throw 'SHA256 hash generation failed.' }
+          "SHA256=$hash" | Set-Content artifacts/qualification/SHA256.txt
+
+      - name: Upload qualification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: POS_WPF-qualification-${{ github.sha }}
+          path: artifacts/qualification
+          if-no-files-found: error
