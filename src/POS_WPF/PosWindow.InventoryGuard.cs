@@ -99,19 +99,16 @@ public partial class PosWindow
         borderTemplate.VisualTree = border;
         root.SetValue(Control.TemplateProperty, borderTemplate);
 
-        var content = new FrameworkElementFactory(typeof(Grid));
+        var content = new FrameworkElementFactory(typeof(StackPanel));
         content.SetValue(FrameworkElement.MarginProperty, new Thickness(13));
         content.AppendChild(BoundTextBlock(nameof(PopularProduct.SkuText), 9, new SolidColorBrush(Color.FromRgb(100, 116, 139)), FontWeights.SemiBold));
-
         var name = BoundTextBlock(nameof(PopularProduct.Name), 15, new SolidColorBrush(Color.FromRgb(15, 23, 42)), FontWeights.Bold);
-        name.SetValue(Grid.RowProperty, 1);
-        name.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        name.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 5, 0, 0));
         content.AppendChild(name);
 
         var pricePanel = new FrameworkElementFactory(typeof(StackPanel));
         pricePanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        pricePanel.SetValue(Grid.RowProperty, 2);
-        pricePanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
+        pricePanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 7, 0, 0));
         pricePanel.AppendChild(BoundTextBlock(nameof(PopularProduct.PriceText), 18, new SolidColorBrush(Color.FromRgb(76, 161, 59)), FontWeights.Bold));
         var unit = BoundTextBlock(nameof(PopularProduct.UnitName), 12, new SolidColorBrush(Color.FromRgb(148, 163, 184)), FontWeights.SemiBold);
         unit.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 5, 0, 0));
@@ -119,16 +116,11 @@ public partial class PosWindow
         content.AppendChild(pricePanel);
 
         var info = new FrameworkElementFactory(typeof(ProductCardStockInfo));
-        info.SetValue(Grid.RowProperty, 3);
-        info.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 4, 0, 0));
+        info.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 6, 0, 0));
         info.SetBinding(ProductCardStockInfo.ProductIdProperty, new Binding(nameof(PopularProduct.ProductId)));
         content.AppendChild(info);
 
-        var rowDefinitions = new FrameworkElementFactory(typeof(RowDefinition));
-        rowDefinitions.SetValue(RowDefinition.HeightProperty, GridLength.Auto);
-        content.AppendChild(rowDefinitions);
         root.AppendChild(content);
-
         template.VisualTree = root;
         template.Seal();
         PopularProductsPanel.ItemTemplate = template;
@@ -259,7 +251,6 @@ public partial class PosWindow
     {
         public static readonly DependencyProperty ProductIdProperty = DependencyProperty.Register(nameof(ProductId), typeof(Guid), typeof(ProductCardStockInfo), new PropertyMetadata(Guid.Empty, OnProductIdChanged));
         public Guid ProductId { get => (Guid)GetValue(ProductIdProperty); set => SetValue(ProductIdProperty, value); }
-
         private readonly TextBlock _text = new() { FontSize = 8, Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)) };
         private readonly Ellipse _indicator = new() { Width = 9, Height = 9, Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
 
