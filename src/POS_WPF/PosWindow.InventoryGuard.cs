@@ -3,11 +3,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Microsoft.EntityFrameworkCore;
-using POS_WPF.Domain.Products;
-using POS_WPF.Domain.Sales;
 
 namespace POS_WPF;
 
@@ -15,6 +14,7 @@ public partial class PosWindow
 {
     private static readonly bool _inventoryGuardRegistered = RegisterInventoryGuardHandlers();
     private bool _inventoryCardRefreshRunning;
+    private bool _inventoryAwareInitialized;
 
     private static bool RegisterInventoryGuardHandlers()
     {
@@ -26,12 +26,13 @@ public partial class PosWindow
     private static void OnInventoryGuardLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is not PosWindow window) return;
-        window.Dispatcher.BeginInvoke(new Action(() => window.InitializeInventoryAwareProductCards()), System.Windows.Threading.DispatcherPriority.Background);
+        window.Dispatcher.BeginInvoke(new Action(window.InitializeInventoryAwareProductCards), System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private void InitializeInventoryAwareProductCards()
     {
-        if (PopularProductsPanel is null) return;
+        if (_inventoryAwareInitialized || PopularProductsPanel is null) return;
+        _inventoryAwareInitialized = true;
         ApplyInventoryAwareProductTemplate();
         DependencyPropertyDescriptorHelper.Attach(PopularProductsPanel, ItemsControl.ItemsSourceProperty, async () => await RefreshProductCardsForStockAsync());
         _ = RefreshProductCardsForStockAsync();
@@ -46,30 +47,16 @@ public partial class PosWindow
             if (PopularProductsPanel.ItemsSource is not System.Collections.IEnumerable source) return;
             var items = source.Cast<object>().OfType<PopularProduct>().ToList();
             if (items.Count == 0) return;
-
             await using var db = await _dbFactory.CreateDbContextAsync();
             var warehouse = await db.Warehouses.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Code).FirstOrDefaultAsync();
             if (warehouse is null) return;
-
             var ids = items.Select(x => x.ProductId).Distinct().ToList();
-            var stock = await db.InventoryTransactions.AsNoTracking()
-                .Where(x => ids.Contains(x.ProductId) && x.WarehouseId == warehouse.Id)
-                .GroupBy(x => x.ProductId)
-                .Select(g => new { ProductId = g.Key, Quantity = g.Sum(x => x.BaseQuantity) })
-                .ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
-
+            var stock = await db.InventoryTransactions.AsNoTracking().Where(x => ids.Contains(x.ProductId) && x.WarehouseId == warehouse.Id).GroupBy(x => x.ProductId).Select(g => new { ProductId = g.Key, Quantity = g.Sum(x => x.BaseQuantity) }).ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
             var visible = items.Where(x => stock.GetValueOrDefault(x.ProductId) > 0m).ToList();
-            if (visible.Count != items.Count)
-                PopularProductsPanel.ItemsSource = visible;
+            if (visible.Count != items.Count) PopularProductsPanel.ItemsSource = visible;
         }
-        catch (Exception ex)
-        {
-            Status(ex.InnerException?.Message ?? ex.Message, false);
-        }
-        finally
-        {
-            _inventoryCardRefreshRunning = false;
-        }
+        catch (Exception ex) { Status(ex.InnerException?.Message ?? ex.Message, false); }
+        finally { _inventoryCardRefreshRunning = false; }
     }
 
     private void ApplyInventoryAwareProductTemplate()
@@ -79,7 +66,7 @@ public partial class PosWindow
         root.SetValue(FrameworkElement.WidthProperty, 296d);
         root.SetValue(FrameworkElement.HeightProperty, 108d);
         root.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 10));
-        root.SetValue(Control.PaddingProperty, new Thickness(12));
+        root.SetValue(Control.PaddingProperty, new Thickness(0));
         root.SetValue(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch);
         root.SetValue(Control.VerticalContentAlignmentProperty, VerticalAlignment.Stretch);
         root.SetValue(Control.BackgroundProperty, Brushes.White);
@@ -93,7 +80,6 @@ public partial class PosWindow
         border.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
-        border.SetValue(Border.PaddingProperty, new Thickness(12));
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
         presenter.SetBinding(ContentPresenter.ContentProperty, new Binding(nameof(ContentControl.Content)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
         presenter.SetBinding(ContentPresenter.HorizontalAlignmentProperty, new Binding(nameof(Control.HorizontalContentAlignment)) { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
@@ -102,30 +88,24 @@ public partial class PosWindow
         borderTemplate.VisualTree = border;
         root.SetValue(Control.TemplateProperty, borderTemplate);
 
-        var content = new FrameworkElementFactory(typeof(Grid));
-        content.SetValue(FrameworkElement.IsHitTestVisibleProperty, true);
-        content.AppendChild(BoundTextBlock(nameof(PopularProduct.SkuText), 0, 0, 8, new SolidColorBrush(Color.FromRgb(148, 163, 184))));
-        content.AppendChild(BoundTextBlock(nameof(PopularProduct.Name), 1, 0, 12, new SolidColorBrush(Color.FromRgb(23, 32, 51)), FontWeights.SemiBold));
+        var content = new FrameworkElementFactory(typeof(StackPanel));
+        content.SetValue(FrameworkElement.MarginProperty, new Thickness(12));
+        content.AppendChild(BoundTextBlock(nameof(PopularProduct.SkuText), 8, new SolidColorBrush(Color.FromRgb(148, 163, 184))));
+        content.AppendChild(BoundTextBlock(nameof(PopularProduct.Name), 12, new SolidColorBrush(Color.FromRgb(23, 32, 51)), FontWeights.SemiBold));
 
         var pricePanel = new FrameworkElementFactory(typeof(StackPanel));
         pricePanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        pricePanel.SetValue(Grid.RowProperty, 2);
-        var price = BoundTextBlock(nameof(PopularProduct.PriceText), 0, 0, 15, new SolidColorBrush(Color.FromRgb(22, 163, 74)), FontWeights.Bold);
-        pricePanel.AppendChild(price);
-        var unit = BoundTextBlock(nameof(PopularProduct.UnitName), 0, 0, 8, new SolidColorBrush(Color.FromRgb(148, 163, 184)));
+        pricePanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 4, 0, 0));
+        pricePanel.AppendChild(BoundTextBlock(nameof(PopularProduct.PriceText), 15, new SolidColorBrush(Color.FromRgb(22, 163, 74)), FontWeights.Bold));
+        var unit = BoundTextBlock(nameof(PopularProduct.UnitName), 8, new SolidColorBrush(Color.FromRgb(148, 163, 184)));
         unit.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 4, 0, 0));
         pricePanel.AppendChild(unit);
         content.AppendChild(pricePanel);
 
         var info = new FrameworkElementFactory(typeof(ProductCardStockInfo));
-        info.SetValue(Grid.RowProperty, 3);
         info.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
         info.SetBinding(ProductCardStockInfo.ProductIdProperty, new Binding(nameof(PopularProduct.ProductId)));
         content.AppendChild(info);
-
-        var rows = new FrameworkElementFactory(typeof(RowDefinition));
-        rows.SetValue(RowDefinition.HeightProperty, new GridLength(1, GridUnitType.Auto));
-        content.AppendChild(rows);
         root.SetValue(ContentControl.ContentProperty, content);
         template.VisualTree = root;
         template.Seal();
@@ -133,12 +113,10 @@ public partial class PosWindow
         PopularProductsPanel.ItemContainerStyle = null;
     }
 
-    private static FrameworkElementFactory BoundTextBlock(string property, int row, int column, double fontSize, Brush foreground, FontWeight? weight = null)
+    private static FrameworkElementFactory BoundTextBlock(string property, double fontSize, Brush foreground, FontWeight? weight = null)
     {
         var text = new FrameworkElementFactory(typeof(TextBlock));
         text.SetBinding(TextBlock.TextProperty, new Binding(property));
-        text.SetValue(Grid.RowProperty, row);
-        text.SetValue(Grid.ColumnProperty, column);
         text.SetValue(Control.FontSizeProperty, fontSize);
         text.SetValue(Control.ForegroundProperty, foreground);
         if (weight.HasValue) text.SetValue(Control.FontWeightProperty, weight.Value);
@@ -160,11 +138,7 @@ public partial class PosWindow
             if (item.UnitId == Guid.Empty) throw new InvalidOperationException("The product has no base selling unit.");
             var existing = _cart.FirstOrDefault(x => x.ProductId == item.ProductId && x.UnitId == item.UnitId);
             var requested = (existing?.Quantity ?? 0m) + 1m;
-            if (!await HasSufficientStockAsync(item.ProductId, item.UnitId, requested))
-            {
-                Status("المخزون لا يكفي للإضافة.", false);
-                return;
-            }
+            if (!await HasSufficientStockAsync(item.ProductId, item.UnitId, requested)) { Status("المخزون لا يكفي للإضافة.", false); return; }
             if (existing is null)
             {
                 existing = new CartItem(item.ProductId, item.UnitId, item.Name, item.UnitName, 1m, item.Price);
@@ -196,11 +170,7 @@ public partial class PosWindow
             if (!match.Unit.CanSell) { Status("This unit is not sellable.", false); return; }
             var existing = _cart.FirstOrDefault(x => x.ProductId == match.Product.Id && x.UnitId == match.Unit.Id);
             var requested = (existing?.Quantity ?? 0m) + 1m;
-            if (!await HasSufficientStockAsync(match.Product.Id, match.Unit.Id, requested))
-            {
-                Status("المخزون لا يكفي للإضافة.", false);
-                return;
-            }
+            if (!await HasSufficientStockAsync(match.Product.Id, match.Unit.Id, requested)) { Status("المخزون لا يكفي للإضافة.", false); return; }
             if (existing is null)
             {
                 existing = new CartItem(match.Product.Id, match.Unit.Id, match.Product.Name, match.Unit.Name, match.Unit.ConversionFactorToBase, match.Unit.SellingPrice);
