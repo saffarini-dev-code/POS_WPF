@@ -1,0 +1,44 @@
+name: Fix POS layout crash
+
+on:
+  push:
+    branches: [ci-production]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'Fix POS WPF NaN layout crash') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ci-production
+          fetch-depth: 0
+      - name: Apply deterministic POS product layout
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/POS_WPF/PosWindow.xaml')
+          s = p.read_text(encoding='utf-8')
+          old = '<ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>'
+          new = '<ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate>'
+          s2 = s.replace(old, new)
+          old_sold = '''<TextBlock Text="{Binding SoldText}" FontSize="8" Foreground="#94A3B8"\n                                                           HorizontalAlignment="Right" Margin="Auto,0,0,0"/>'''
+          new_sold = '''<TextBlock Text="{Binding SoldText}" FontSize="8" Foreground="#94A3B8"\n                                                           HorizontalAlignment="Right" Margin="8,0,0,0"/>'''
+          s2 = s2.replace(old_sold, new_sold)
+          if s2 == s:
+              raise SystemExit('Expected POS layout pattern was not found; refusing to create a no-op fix.')
+          p.write_text(s2, encoding='utf-8')
+          PY
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-pos-layout.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/POS_WPF/PosWindow.xaml .github/workflows/fix-pos-layout.yml
+          git commit -m 'Fix POS WPF NaN layout crash'
+          git push origin HEAD:ci-production
