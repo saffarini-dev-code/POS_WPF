@@ -1,0 +1,304 @@
+name: Apply POS cart controls and tax calculation fix
+
+on:
+  push:
+    branches: [ci-production]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply POS cart controls and tax calculation fix') }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ci-production
+          fetch-depth: 0
+
+      - name: Update POS cart UI and behavior
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import re
+
+          xaml_path = Path('src/POS_WPF/PosWindow.xaml')
+          cs_path = Path('src/POS_WPF/PosWindow.xaml.cs')
+
+          xaml = xaml_path.read_text(encoding='utf-8')
+          cs = cs_path.read_text(encoding='utf-8')
+
+          # 1) Circular cart controls: red decrease, green increase, trash delete.
+          marker = '        <Style x:Key="TouchKeyStyle" TargetType="Button" BasedOn="{StaticResource BaseButton}">'
+          if 'x:Key="CartDecreaseButtonStyle"' not in xaml:
+              insert_at = xaml.index(marker)
+              styles = '''        <Style x:Key="CartQuantityButtonStyle" TargetType="Button">
+              <Setter Property="Width" Value="28"/>
+              <Setter Property="Height" Value="28"/>
+              <Setter Property="MinWidth" Value="28"/>
+              <Setter Property="MinHeight" Value="28"/>
+              <Setter Property="Padding" Value="0"/>
+              <Setter Property="FontSize" Value="14"/>
+              <Setter Property="FontWeight" Value="Bold"/>
+              <Setter Property="Foreground" Value="White"/>
+              <Setter Property="BorderThickness" Value="0"/>
+              <Setter Property="HorizontalContentAlignment" Value="Center"/>
+              <Setter Property="VerticalContentAlignment" Value="Center"/>
+              <Setter Property="Template">
+                  <Setter.Value>
+                      <ControlTemplate TargetType="Button">
+                          <Border Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  CornerRadius="14">
+                              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                      </ControlTemplate>
+                  </Setter.Value>
+              </Setter>
+          </Style>
+          <Style x:Key="CartDecreaseButtonStyle" TargetType="Button" BasedOn="{StaticResource CartQuantityButtonStyle}">
+              <Setter Property="Background" Value="#DC2626"/>
+          </Style>
+          <Style x:Key="CartIncreaseButtonStyle" TargetType="Button" BasedOn="{StaticResource CartQuantityButtonStyle}">
+              <Setter Property="Background" Value="#16A34A"/>
+          </Style>
+          <Style x:Key="CartDeleteButtonStyle" TargetType="Button">
+              <Setter Property="Width" Value="28"/>
+              <Setter Property="Height" Value="28"/>
+              <Setter Property="MinWidth" Value="28"/>
+              <Setter Property="MinHeight" Value="28"/>
+              <Setter Property="Padding" Value="0"/>
+              <Setter Property="FontSize" Value="13"/>
+              <Setter Property="Foreground" Value="#DC2626"/>
+              <Setter Property="Background" Value="#FEF2F2"/>
+              <Setter Property="BorderBrush" Value="#FECACA"/>
+              <Setter Property="BorderThickness" Value="1"/>
+              <Setter Property="HorizontalContentAlignment" Value="Center"/>
+              <Setter Property="VerticalContentAlignment" Value="Center"/>
+              <Setter Property="Template">
+                  <Setter.Value>
+                      <ControlTemplate TargetType="Button">
+                          <Border Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  CornerRadius="14">
+                              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                      </ControlTemplate>
+                  </Setter.Value>
+              </Setter>
+          </Style>
+'''
+              xaml = xaml[:insert_at] + styles + xaml[insert_at:]
+
+          # 2) Cart item: one horizontal row with product, unit, discount, +/- , price, delete.
+          item_template = '''                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#EEF1F5" BorderThickness="0,0,0,1" Padding="8,7">
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MinWidth="120"/>
+                                                <ColumnDefinition Width="58"/>
+                                                <ColumnDefinition Width="96"/>
+                                                <ColumnDefinition Width="58"/>
+                                                <ColumnDefinition Width="34"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" MinWidth="0">
+                                                <TextBlock Text="{Binding ProductName}" FontSize="11" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding UnitName}" FontSize="8" Foreground="#94A3B8"
+                                                           Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <TextBox Grid.Column="1" Width="52" Height="24" Margin="4,0"
+                                                     Text="{Binding ManualDiscount, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                                     FontSize="9" TextAlignment="Right" VerticalContentAlignment="Center"
+                                                     ToolTip="Discount" LostFocus="CartDiscount_LostFocus"/>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Button Content="−" Tag="{Binding}" Click="DecreaseQuantity_Click"
+                                                        Style="{StaticResource CartDecreaseButtonStyle}" ToolTip="Decrease quantity"/>
+                                                <TextBlock Text="{Binding Quantity,StringFormat=N0}" Width="28" TextAlignment="Center"
+                                                           VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"/>
+                                                <Button Content="+" Tag="{Binding}" Click="IncreaseQuantity_Click"
+                                                        Style="{StaticResource CartIncreaseButtonStyle}" ToolTip="Increase quantity"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="3" Text="{Binding LineTotal,StringFormat=N2}" TextAlignment="Right"
+                                                       VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Margin="2,0"/>
+                                            <Button Grid.Column="4" Content="🗑" Tag="{Binding}" Click="DeleteProduct_Click"
+                                                    Style="{StaticResource CartDeleteButtonStyle}" ToolTip="Remove product"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>'''
+          pattern = r'                            <ListView\.ItemTemplate>.*?                            </ListView\.ItemTemplate>'
+          xaml, count = re.subn(pattern, item_template, xaml, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Cart ListView.ItemTemplate was not found exactly once.')
+
+          # 3) Totals: fixed value column and explicit right alignment so values stack cleanly.
+          totals_old = '''                    <Border Grid.Row="2" BorderBrush="#E2E8F0" BorderThickness="0,1,0,1" Padding="12,7">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="30"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="34"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>'''
+          totals_new = '''                    <Border Grid.Row="2" BorderBrush="#E2E8F0" BorderThickness="0,1,0,1" Padding="12,7">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="30"/>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="34"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="88"/></Grid.ColumnDefinitions>'''
+          if totals_old not in xaml:
+              raise SystemExit('Totals grid header was not found.')
+          xaml = xaml.replace(totals_old, totals_new, 1)
+          xaml = xaml.replace('''                            <TextBlock Grid.Row="1" Text="Subtotal" FontSize="10" Foreground="#64748B" Margin="0,6,0,0"/>
+                            <TextBlock x:Name="SubtotalText" Grid.Row="1" Grid.Column="1" Text="0.00" FontSize="10" Margin="0,6,0,0"/>''', '''                            <TextBlock Grid.Row="1" Text="Subtotal" FontSize="10" Foreground="#64748B" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="SubtotalText" Grid.Row="1" Grid.Column="1" Text="0.00" FontSize="10" TextAlignment="Right" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>''', 1)
+          xaml = xaml.replace('''                            <TextBlock x:Name="DiscountText" Grid.Row="2" Grid.Column="1" Text="0.00" FontSize="10" TextAlignment="Right">''', '''                            <TextBlock x:Name="DiscountText" Grid.Row="2" Grid.Column="1" Text="0.00" FontSize="10" TextAlignment="Right" HorizontalAlignment="Stretch" VerticalAlignment="Center">''', 1)
+          xaml = xaml.replace('''                            <TextBlock x:Name="TaxLabel" Grid.Row="3" Text="Tax" FontSize="10" Foreground="#64748B">''', '''                            <TextBlock x:Name="TaxLabel" Grid.Row="3" Text="Tax" FontSize="10" Foreground="#64748B" VerticalAlignment="Center">''', 1)
+          xaml = xaml.replace('''                            <TextBlock x:Name="TaxText" Grid.Row="3" Grid.Column="1" Text="{Binding Text, ElementName=ReceiptTaxText}" FontSize="10" TextAlignment="Right">''', '''                            <TextBlock x:Name="TaxText" Grid.Row="3" Grid.Column="1" Text="{Binding Text, ElementName=ReceiptTaxText}" FontSize="10" TextAlignment="Right" HorizontalAlignment="Stretch" VerticalAlignment="Center">''', 1)
+
+          xaml_path.write_text(xaml, encoding='utf-8')
+
+          # 4) Tax must be refreshed whenever cart contents or discounts change.
+          cs = cs.replace('''    private decimal _invoiceDiscount;\n    private string _paymentMethod''', '''    private decimal _invoiceDiscount;\n    private bool _showTaxOnInvoice;\n    private string _paymentMethod''', 1)
+          cs = cs.replace('''            SelectPaymentMethod("Card");\n            BarcodeBox.Focus();\n            RefreshTotal();''', '''            SelectPaymentMethod("Card");\n            BarcodeBox.Focus();\n            RefreshTaxAndTotals();''', 1)
+          cs = cs.replace('''            await ApplyPromotionAsync(existing);\n            RefreshTotal();\n            Status($"Added {item.Name}.", true);''', '''            await ApplyPromotionAsync(existing);\n            RefreshTaxAndTotals();\n            Status($"Added {item.Name}.", true);''', 1)
+          cs = cs.replace('''            await ApplyPromotionAsync(existing);\n            RefreshTotal();\n            Status($"Added {match.Product.Name} ({match.Unit.Abbreviation}).", true);''', '''            await ApplyPromotionAsync(existing);\n            RefreshTaxAndTotals();\n            Status($"Added {match.Product.Name} ({match.Unit.Abbreviation}).", true);''', 1)
+
+          old_decrease = '''    private void IncreaseQuantity_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: CartItem item }) { item.Quantity += 1; _ = RecalculateLineAsync(item); }
+    }
+
+    private void DecreaseQuantity_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: CartItem item }) return;
+        item.Quantity -= 1;
+        if (item.Quantity <= 0) _cart.Remove(item);
+        else _ = RecalculateLineAsync(item);
+        RefreshTotal();
+    }
+
+    private async Task RecalculateLineAsync(CartItem item) { await ApplyPromotionAsync(item); RefreshTotal(); }'''
+          new_decrease = '''    private void IncreaseQuantity_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: CartItem item }) return;
+        item.Quantity += 1;
+        _ = RecalculateLineAsync(item);
+    }
+
+    private void DecreaseQuantity_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: CartItem item }) return;
+
+        if (item.Quantity <= 1)
+        {
+            var result = MessageBox.Show(
+                $"سيتم حذف المنتج \\"{item.ProductName}\\" من السلة. هل تريد المتابعة؟",
+                "تأكيد حذف المنتج",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            _cart.Remove(item);
+            RefreshTaxAndTotals();
+            Status($"Removed {item.ProductName} from cart.", true);
+            return;
+        }
+
+        item.Quantity -= 1;
+        _ = RecalculateLineAsync(item);
+    }
+
+    private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: CartItem item }) return;
+
+        var result = MessageBox.Show(
+            $"سيتم حذف المنتج \\"{item.ProductName}\\" من السلة مهما كانت الكمية. هل تريد المتابعة؟",
+            "تأكيد حذف المنتج",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        _cart.Remove(item);
+        RefreshTaxAndTotals();
+        Status($"Removed {item.ProductName} from cart.", true);
+    }
+
+    private async Task RecalculateLineAsync(CartItem item)
+    {
+        await ApplyPromotionAsync(item);
+        RefreshTaxAndTotals();
+    }'''
+          if old_decrease not in cs:
+              raise SystemExit('Quantity handlers were not found.')
+          cs = cs.replace(old_decrease, new_decrease, 1)
+
+          cs = cs.replace('''        RefreshTotal();\n        Status("Invoice discount applied.", true);''', '''        RefreshTaxAndTotals();\n        Status("Invoice discount applied.", true);''', 1)
+          cs = cs.replace('''        RefreshTotal();\n        Status("Cart cleared.", true);''', '''        RefreshTaxAndTotals();\n        Status("Cart cleared.", true);''', 1)
+          cs = cs.replace('''            RefreshTotal();\n            Status($"Held order recalled: {held.Reference}.", true);''', '''            RefreshTaxAndTotals();\n            Status($"Held order recalled: {held.Reference}.", true);''', 1)
+
+          # 5) Receipt includes subtotal, discount, tax, total and change.
+          cs = cs.replace('''            _lastReceipt = BuildReceipt(number, result.Total, result.Change);''', '''            _lastReceipt = BuildReceipt(number, result.Total, result.Change);''', 1)
+          cs = re.sub(
+              r'    private string BuildReceipt\(string number, decimal total, decimal change\) => .*?;\n',
+              '''    private string BuildReceipt(string number, decimal total, decimal change)\n    {\n        var subtotal = _cart.Sum(x => x.Quantity * x.UnitPrice);\n        var discount = _cart.Sum(x => x.Discount) + _invoiceDiscount;\n        var tax = _cart.Sum(x => x.Tax);\n        var taxLine = _showTaxOnInvoice && tax > 0m ? $"TAX: {tax:N2}{Environment.NewLine}" : string.Empty;\n        return $"RETAIL POS{Environment.NewLine}{number}{Environment.NewLine}------------------------------{Environment.NewLine}SUBTOTAL: {subtotal:N2}{Environment.NewLine}DISCOUNT: {discount:N2}{Environment.NewLine}{taxLine}TOTAL: {total:N2}{Environment.NewLine}CHANGE: {change:N2}{Environment.NewLine}Thank you{Environment.NewLine}";\n    }\n''',
+              cs,
+              count=1,
+              flags=re.S)
+
+          # 6) Keep total display aligned and ensure disabled tax contributes exactly zero.
+          cs = cs.replace('''        ReceiptTaxText.Text = tax.ToString("N2", CultureInfo.CurrentCulture);''', '''        ReceiptTaxText.Text = (_showTaxOnInvoice ? tax : 0m).ToString("N2", CultureInfo.CurrentCulture);''', 1)
+          cs = cs.replace('''        CartGrid.Items.Refresh();\n        ReceiptItemsPanel.Items.Refresh();''', '''        CartGrid.Items.Refresh();\n        ReceiptItemsPanel.Items.Refresh();\n        UpdateTaxVisibility();''', 1)
+
+          cs_path.write_text(cs, encoding='utf-8')
+          print('POS XAML/C# changes applied.')
+          '@ | Set-Content -Path update_pos.py -Encoding UTF8
+          python update_pos.py
+          Remove-Item update_pos.py -Force
+
+      - name: Update tax settings partial
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p = Path('src/POS_WPF/PosWindow.Tax.cs')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('''            _taxEnabled = settings?.IsEnabled == true;\n            _taxRate = settings?.Rate ?? 0m;\n            _pricesIncludeTax = settings?.PricesIncludeTax == true;''', '''            _taxEnabled = settings?.IsEnabled == true;\n            _taxRate = settings?.Rate ?? 0m;\n            _pricesIncludeTax = settings?.PricesIncludeTax == true;\n            _showTaxOnInvoice = settings?.ShowTaxOnInvoice == true && _taxEnabled;''', 1)
+          s = s.replace('''            _taxEnabled = false;\n            _taxRate = 0m;\n            _pricesIncludeTax = false;''', '''            _taxEnabled = false;\n            _taxRate = 0m;\n            _pricesIncludeTax = false;\n            _showTaxOnInvoice = false;''', 1)
+          p.write_text(s, encoding='utf-8')
+          '@ | Set-Content -Path update_tax.py -Encoding UTF8
+          python update_tax.py
+          Remove-Item update_tax.py -Force
+
+      - name: Build POS_WPF
+        shell: pwsh
+        run: dotnet build .\src\POS_WPF\POS_WPF.csproj -c Release --no-restore
+
+      - name: Commit changes and remove temporary workflow
+        shell: pwsh
+        run: |
+          Remove-Item .github/workflows/apply-pos-cart-tax-fix.yml -Force
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/POS_WPF/PosWindow.xaml src/POS_WPF/PosWindow.xaml.cs src/POS_WPF/PosWindow.Tax.cs .github/workflows/apply-pos-cart-tax-fix.yml
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { throw 'No changes were produced; refusing to create a no-op commit.' }
+          git commit -m 'Apply POS cart controls and tax calculation fix'
+          git push origin HEAD:ci-production
