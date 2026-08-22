@@ -59,6 +59,7 @@ jobs:
         run: dotnet run --project src/POS_WPF/POS_WPF.csproj --configuration Release --no-build -- --verify
 
       - name: Commit receipt tax patch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/ci-production'
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
@@ -69,4 +70,4 @@ jobs:
             exit 0
           }
           git commit -m 'Include tax on POS receipt when tax is enabled'
-          git push origin HEAD:${{ github.ref_name }}
+          git push origin HEAD:refs/heads/ci-production
